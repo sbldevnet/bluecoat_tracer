@@ -37,7 +37,22 @@ pip install -r requirements.txt
 python3 bluecoat_tracer.py
 ```
 3. Interact with menu
-`picture`
+```bash
+[GLOBAL VARIABLES]
+Auth method: 
+Proxy Port: 8080
+Exclude layers: ['Layer_Test']
+
+[OPTIONS]
+[1]: Search source IP match
+[2]: Search destination (IP/FQDN/URL)
+[3]: Search source/destination
+[4]: Get / Select authentication
+[5]: Select proxy port
+[6]: Download policy xml
+[0]: Exit
+Select Option: 
+```
 
 
 ## Requirements
