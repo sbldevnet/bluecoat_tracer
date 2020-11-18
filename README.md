@@ -16,9 +16,9 @@ It allows you to easily locate the rule in the policy that matches the input par
 
 
 ## Features
-* Show policy rules that match with a source IP.
-* `WIP` Show policy rules that match with a destination URL.
-* `WIP` Show policy rules that match with a source IP and destination URL.
+* Dispalys the policy rules that match with a source IP.
+* `WIP` Displays the policy rules that match with a destination URL.
+* `WIP` Displays the policy rules that match with a source IP and destination URL.
 * List and select authentication method.
 * Select explicit proxy port.
 * List and download the desired policy version.
