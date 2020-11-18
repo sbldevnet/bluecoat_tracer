@@ -32,7 +32,7 @@ pip install -r requirements.txt
 
 ## Usage
 1. Edit `vars.py` and modify variables.
-2. Execute CLI
+2. Execute python script
 ```bash
 python3 bluecoat_tracer.py
 ```
@@ -78,6 +78,7 @@ ONLINE = True
 
 ## Contribute
 Contributions are always welcome!
+
 `WIP` CICD test and python quality code.
 
 
