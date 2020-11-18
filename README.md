@@ -43,10 +43,18 @@ python3 bluecoat_tracer.py
 ## Requirements
 
 #### Offline mode
+`vars.py`
+```python3
+ONLINE = False
+```
 * python3 & requirements file installed.
 * xml proxy policy.
 
 #### Online mode
+`vars.py`
+```python3
+ONLINE = True
+```
 * python3 & requirements file installed.
 * xml proxy policy (can be downloaded with the script).
 * Network access to Symantec Management Center and user with API permissions.
