@@ -1,3 +1,4 @@
 # HTTP Requests
 requests
 urllib3
+tabulate
