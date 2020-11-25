@@ -18,8 +18,8 @@ NODE_URL    = 'https://example:8082/' # Admistration proxy
 # (Int) Proxy explicit port for policy trace
 proxy_port = 8080
 
-#(String)
-# AUTHENTICATION = ''
+#(str) Authentication method, group-base in xml
+AUTH_METHOD = ''
 
 # (String List)
 EXCLUDE_LAYERS = ['Test_LAYER']
