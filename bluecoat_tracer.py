@@ -7,11 +7,15 @@ How To
     2. Exec pip install -r requirements.txt
     2. Exec python3 bluecoat_tracer.py
 
+Versions
+--------
+    Tested in vpmxml-info version = 631.
+
 Limitations
 -----------
     Only check UserAuthenticationPolicyTable & WebAccessPolicyTable layers
-    Not check if "negate" check is in policy
     Not check Threat Risk Level (TL) (Not available in API)
+    Not check ip-address in proxy object
 """
 
 # Import dependencies
@@ -24,6 +28,7 @@ import re
 from getpass import getpass
 import requests
 import urllib3
+from tabulate import tabulate
 # Import var file
 from vars import *
 
@@ -31,7 +36,6 @@ from vars import *
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Global variables
-AUTH_METHOD = ''
 PROXY_PORT = proxy_port
 
 # Define Colors
@@ -89,8 +93,8 @@ def main():
     print()
     print(f"{bcolors.BLUE}[OPTIONS]{bcolors.RESET}")
     print("[1]: Search source IP match")
-    print("[2]: Search destination (IP/FQDN/URL)")
-    print("[3]: Search source/destination")
+    print(f"[2]: {bcolors.RED}[WIP]{bcolors.RESET}Search destination (IP/FQDN/URL)")
+    print(f"[3]: {bcolors.YELLOW}[Testing]{bcolors.RESET}Search source/destination")
     print("[4]: Get / Select authentication")
     print("[5]: Select proxy port")
     print("[6]: Download policy xml")
@@ -101,7 +105,7 @@ def main():
         option = int(input())
         switcher = {
             1: menu_search_source_ip,
-            2: menu_search_dest,
+            2: get_online_categories,
             3: search_complete,
             4: edit_auth,
             5: edit_proxy_port,
@@ -143,17 +147,21 @@ def menu_search_source_ip():
         print_start()
 
         # Get all ipobjects that matches with source ip
-        match_ipobjects = get_xml_ipobject_match(root, input_src)
+        match_src_objects = get_xml_src_object_match(root, input_src)
 
         # Get comb-obj that contains match_ipbojects. This improves efficency
-        match_comb_obj = get_xml_com_obj_match(root, match_ipobjects)
+        match_comb_obj = get_xml_com_obj_match(root, match_src_objects)
 
         layers_enabled = get_xml_policy_layers(root)
         for layer in layers_enabled:
-            if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable' \
+            if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable'\
             or layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.WebAccessPolicyTable':
-                get_rows_src_match(layer, match_ipobjects, match_comb_obj, False, [], urlparse(''))
-        
+                match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj)
+                print_layer_row(match_array_src)
+
+        msg_wrn("INFO: Objects matched")
+        print(match_src_objects)
+        print(match_comb_obj)
         print_end()
 
     except ValueError as e:
@@ -166,75 +174,6 @@ def menu_search_source_ip():
 # [2]: search_dest
 ##############################
 
-def menu_search_dest():
-    """
-    Description:
-        Get user and password
-        Get custom and Symantec predefined Categories from proxy node
-    """
-    logging.debug("Exec: menu_search_dest()")
-
-    # Ask User & Pass
-    print("Enter User: ", end="")
-    user = input()
-    print("Enter Pass: ", end="")
-    password = getpass()
-    rtext = get_proxy_categories(user,password)
-    print(rtext)
-    if "Error" in str(rtext):
-        logging.error("Error in response in menu_search_dest()" + str(rtext))
-        msg_sys(str(rtext))
-    else:
-        print()
-        policy = rtext[0].rsplit(':',1)[1].strip()
-        bluecoat = rtext[1].rsplit(':',1)[1].strip()
-        print(policy)
-        print(bluecoat)
-
-    main()
-
-
-def get_proxy_categories(user, password):
-    """
-    Description:
-        Get custom and Symantec predefined Categories from proxy node
-    Input:
-        user        - (String) user of symantec management center
-        password    - (String) password of symantec management center
-    Output:
-        rtext       - (String) HTTP Response categories in text
-        
-    """
-    logging.debug("Exec: get_proxy_categories()")
-
-    try:
-        req = requests.get(NODE_URL+"ContentFilter/TestUrl/google.es", verify=False, auth=(user, password))
-        logging.info("HTTP Status code in get_proxy_categories() + '" + str(req.status_code) + "'")
-
-        if req.status_code == 200:
-            rtext = req.text.strip().split('\n')
-            return rtext
-
-        elif req.status_code == 401:
-            sys.exit(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
-
-        elif req.status_code == 403:
-            sys.exit(f"{bcolors.RED}Forbidden{bcolors.RESET}")
-
-        else:
-            logging.error("Status Code not handled in get_proxy_categories()")
-            sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
-
-    except ValueError as e:
-        logging.error("Error in response in get_proxy_categories()" + str(e))
-
-    except requests.exceptions.ConnectionError as e:
-        logging.error("Connection error in get_proxy_categories(): " + str(e))
-
-    except Exception as e:
-        logging.error("Error not handled in get_proxy_categories(): " + str(e))
-
-    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
 
 
 ##############################
@@ -243,11 +182,17 @@ def get_proxy_categories(user, password):
 
 def search_complete():
     """
+    Description:
+        Dispalys the policy rules that match with a source IP and destination.
     """
     logging.debug("Exec: search_complete()")
 
-    root = get_xml_root()
+    if not ONLINE:
+        msg_wrn("Warning: Function limited with var ONLINE = False")
+        msg_wrn("Not check Blue Coat Categories")
+        msg_sys("Offile mode Currently Work In Progress")
 
+    root = get_xml_root()
     try:
         print("\nEnter source IP: ", end="")
         input_src = ipaddress.ip_address(input())
@@ -256,29 +201,39 @@ def search_complete():
         input_dest = urlparse(input())
 
         if input_dest.netloc == '':
-            print('[Error]: Destination is not in URL format')
+            msg_wrn('[Error]: Destination is not in URL format')
             logging.warning("Input destination search_complete() is not URL:" + str(input_dest))
 
         else:
             print_start()
 
-            # Get all ipobjects that matches with source ip
-            match_ipobjects = get_xml_ipobject_match(root, input_src)
+            # Get all objects that matches with source ip
+            match_src_objects = get_xml_src_object_match(root, input_src)
 
-            # Get comb-obj that contains match_ipbojects
-            match_comb_obj = get_xml_com_obj_match(root, match_ipobjects)
+            # Get comb-obj that contains match_ipbojects. This improves efficency
+            match_comb_obj = get_xml_com_obj_match(root, match_src_objects)
 
-            ###################################
-            ####### GET CATEGORIES ############
-            ###################################
-            dst_categories = ['Test_Category']
-            ##################################
+            # Get all objects that matches with destination
+            match_dst_objects = get_xml_dst_object_match(root, input_dest)
+
+            # Get comb-obj that contains match_ipbojects. This improves efficency
+            match_comb_obj_dst = get_xml_com_obj_match(root, match_dst_objects)
 
             layers_enabled = get_xml_policy_layers(root)
-
             for layer in layers_enabled:
-                if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable' or layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.WebAccessPolicyTable':
-                    get_rows_src_match(layer, match_ipobjects, match_comb_obj, True, dst_categories, input_dest)
+                if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable'\
+                or layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.WebAccessPolicyTable':
+                    match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj)
+                    match_array_dst = get_rows_dst_match(match_array_src, match_dst_objects)
+                    print_layer_row(match_array_dst)
+
+            msg_wrn("INFO: Objects matched")
+            msg_wrn("Src:")
+            print(match_src_objects)
+            print(match_comb_obj)
+            msg_wrn("Dst:")
+            print(match_dst_objects)
+            print(match_comb_obj_dst)
 
             print_end()
 
@@ -366,29 +321,32 @@ def menu_download_policy():
     """
     logging.debug("Exec: menu_download_policy()")
 
-    # Ask User & Pass
-    print("Enter User: ", end="")
-    user = input()
-    print("Enter Pass: ", end="")
-    password = getpass()
-    policies = get_proxy_policies(user,password)
-    print()
+    if not ONLINE:
+        msg_wrn("WARNING: Option not available with var ONLINE = False")
+    else:
+        # Ask User & Pass
+        print("Enter User (Management Center): ", end="")
+        user = input()
+        print("Enter Pass: ", end="")
+        password = getpass()
+        policies = get_proxy_policies(user,password)
+        print()
 
-    for policy in policies:
-        print("Policy uuid: '" + policy['uuid'] + "' Name: '" + policy['name'] + "' Desc: '" + policy['description'] + "'")
+        for policy in policies:
+            print("Policy uuid: '" + policy['uuid'] + "' Name: '" + policy['name'] + "' Desc: '" + policy['description'] + "'")
 
-    # Ask uuid
-    print("Enter Policy uuid: ", end="")
-    policy_uuid = input()
-    versions = get_proxy_policy_versions(user, password, policy_uuid)
-    for version in versions:
-        print("Version: '" + version['revisionNumber'] + "' Date: '" + version['revisionDate'] + "' : '" + version['revisionDescription'] + "'")
+        # Ask uuid
+        print("Enter Policy uuid: ", end="")
+        policy_uuid = input()
+        versions = get_proxy_policy_versions(user, password, policy_uuid)
+        for version in versions:
+            print("Version: '" + version['revisionNumber'] + "' Date: '" + version['revisionDate'] + "' : '" + version['revisionDescription'] + "'")
 
-    # Ask version
-    print("Enter Version: ", end="")
-    revision = input()
-    get_proxy_policy_download(user, password, policy_uuid, revision)
-    print(f"{bcolors.GREEN}[OK]{bcolors.RESET}")
+        # Ask version
+        print("Enter Version: ", end="")
+        revision = input()
+        get_proxy_policy_download(user, password, policy_uuid, revision)
+        print(f"{bcolors.GREEN}[OK]{bcolors.RESET}")
 
     main()
 
@@ -517,6 +475,87 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
 
 
 ##############################
+# Proxy Node Methods
+##############################
+
+# OK
+def get_online_categories(destination):
+    """
+    Description:
+        Get user and password
+        Get custom and Symantec predefined Categories from proxy node
+    Input:
+        destination - (str) destination input.
+    Output:
+        categories  - (str list) [policy, bluecoat] categories.
+    """
+    logging.debug("Exec: get_online_categories()")
+
+    # Ask User & Pass
+    print("Enter User (Proxy Node): ", end="")
+    user = input()
+    print("Enter Pass: ", end="")
+    password = getpass()
+    print()
+    rtext = get_proxy_categories(user,password, destination)
+    logging.info("HTTP Response: %s",rtext)
+    if "Error" in str(rtext):
+        logging.error("Error in response in get_online_categories(): %s",rtext)
+        msg_sys(str(rtext))
+    else:
+        print()
+        policy = rtext[0].rsplit(':',1)[1].strip()
+        bluecoat = rtext[1].rsplit(':',1)[1].strip()
+        categories = [policy, bluecoat]
+        return categories
+
+# OK
+def get_proxy_categories(user, password, destination):
+    """
+    Description:
+        Get custom and Symantec predefined Categories from proxy node.
+    Input:
+        user        - (str) user of symantec management center.
+        password    - (str) password of symantec management center.
+        destination - (str) destination input.
+    Output:
+        rtext       - (str) HTTP Response categories in text.
+
+    """
+    logging.debug("Exec: get_proxy_categories()")
+
+    try:
+        req = requests.get(NODE_URL+"ContentFilter/TestUrl/"+destination,\
+            verify=False, auth=(user, password))
+        logging.info("HTTP Status code in get_proxy_categories() + '%s'",req.status_code)
+
+        if req.status_code == 200:
+            rtext = req.text.strip().split('\n')
+            return rtext
+
+        elif req.status_code == 401:
+            sys.exit(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
+
+        elif req.status_code == 403:
+            sys.exit(f"{bcolors.RED}Forbidden{bcolors.RESET}")
+
+        else:
+            logging.error("Status Code not handled in get_proxy_categories()")
+            sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+
+    except ValueError as e:
+        logging.error("Error in response in get_proxy_categories()" + str(e))
+
+    except requests.exceptions.ConnectionError as e:
+        logging.error("Connection error in get_proxy_categories(): " + str(e))
+
+    except Exception as e:
+        logging.error("Error not handled in get_proxy_categories(): " + str(e))
+
+    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+
+
+##############################
 # XML Methods
 ##############################
 
@@ -524,7 +563,7 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
 def get_xml_root():
     """
     Description:
-        Get xml tree root 
+        Get xml tree root
     Output:
         policy_xml_root - (XML Element) XML root
     """
@@ -536,7 +575,7 @@ def get_xml_root():
     except OSError as e:
         logging.error("No such file in get_xml_root() " + str(e))
         sys.exit(f"{bcolors.RED}No such xml file{bcolors.RESET}: Edit variable FILE_PATH in vars.py file or download with option [6]")
-    
+
 
 def get_xml_object_type(object_search):
     """
@@ -547,116 +586,325 @@ def get_xml_object_type(object_search):
 
     root = get_xml_root()
     object_type = root.find('conditionObjects/*[@name="'+ object_search +'"]').tag
-    
+
     # logging.debug("Object '" + object_search + "' XML Type '" + object_type + "'")
 
     return object_type
 
 # OK
-def get_xml_ipobject_match(root, input_src):
+def get_xml_src_object_match(root, input_src):
     """
     Description:
-        Search match in ipobject and return name list
+        Search match in source objects (ipobject, h-o, proxy, group).
     Input:
-        root        - (XML Element) XML root
-        input_src   - (ipaddress)   source IP address
+        root        - (XML Element) XML root.
+        input_src   - (ipaddress)   source IP address.
     Output:
-        match_ipobjects - (String List) XML ipobjects names that include input_src IP
+        match_src_objects - (str List) Name of XML objects that matches.
     """
-    logging.debug("Exec: get_xml_ipobject_match()")
-    logging.debug("Source IP: " +  str(input_src))
+    logging.debug("Exec: get_xml_src_object_match()")
+    logging.debug("Source IP: %s",input_src)
 
-    match_ipobjects = []
+    match_src_objects = []
+    # ipobject
     for ipobject in root.findall('conditionObjects/ipobject'):
         if input_src in ipaddress.ip_network(ipobject.attrib.get('value'), False):
             ipobject_name = ipobject.attrib.get('name')
             ipobject_subnet = ipobject.attrib.get('value')
-            match_ipobjects.append(ipobject_name)
-            logging.info("Found match. Subnet '" + ipobject_subnet + "'  Name '" + ipobject_name + "'")
-        
-    return match_ipobjects
+            match_src_objects.append(ipobject_name)
+            logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
+    # h-o
+    for h_o_object in root.findall('conditionObjects/h-o'):
+        if input_src in ipaddress.ip_network(h_o_object.attrib.get('h'), False):
+            h_o_object_name = h_o_object.attrib.get('name')
+            h_o_object_host = h_o_object.attrib.get('h')
+            match_src_objects.append(h_o_object_name)
+            logging.info("Object match. Name '%s'  Host '%s'", h_o_object_name, h_o_object_host)
+    # proxy
+    for proxy_object in root.findall("conditionObjects/proxy[@port='"+str(PROXY_PORT)+"']"):
+        proxy_name = proxy_object.attrib.get('name')
+        match_src_objects.append(proxy_name)
+        logging.info("Object match. Name '%s'  Port '%s'", proxy_name, PROXY_PORT)
+    # group
+    for group_object in root.findall("conditionObjects/group[@group-base='"+AUTH_METHOD+"']"):
+        group_name = group_object.attrib.get('name')
+        match_src_objects.append(group_name)
+        logging.info("Object match. Name '%s'  Group-base '%s'", group_name, AUTH_METHOD)
+
+    return match_src_objects
 
 # OK
-def get_xml_com_obj_match(root, match_ipobjects):
+def get_xml_com_obj_match(root, match_src_objects):
     """
     Description:
-        Search comb-obj that contains ipobjects
+        Search comb-obj that contains match_src_objects.
     Input:
-        root            - (XML Element) XML root
-        match_ipobjects - (String List) XML ipobjects names that include input_src IP
+        root                - (XML Element) XML root,
+        match_src_objects   - (str List) XML ipobjects/h-o names that include input_src IP.
     Output:
-        match_comb_obj  - (String List) XML comb_obj names that include some match_ipobjects
+        match_comb_obj      - (str List) XML comb_obj names that include some match_src_objects.
     """
     logging.debug("Exec: get_xml_com_obj_match()")
 
-    match_comb_obj = []
-    for ipobject in match_ipobjects:
-        comb_objs = root.findall('conditionObjects/comb-obj/c-l-1[@n="' + ipobject + '"]...')
-        for comb_obj in comb_objs:
-            comb_obj_name = comb_obj.attrib.get('name')
-            logging.info("Found comb-obj match. Name '" + comb_obj_name + "'")
-            match_comb_obj.append(comb_obj_name)
+    comb_obj_match    = []
+    # comb_obj_no_match = []
+    comb_objs = root.findall('conditionObjects/comb-obj')
+    for comb_obj in comb_objs:
+        comb_obj_name = comb_obj.attrib.get('name')
+        comb_obj_cl1  = comb_obj.attrib.get('n-1') # 'false' = select, 'true' = negate
+        comb_obj_cl2  = comb_obj.attrib.get('n-2') # 'false' = select, 'true' = negate
+        cl1_list      = comb_obj.findall('c-l-1')
+        cl2_list      = comb_obj.findall('c-l-2')
 
-    return match_comb_obj
+        # cl1 false and cl2 false
+        if comb_obj_cl1 == 'false' and comb_obj_cl2 == 'false':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
+                    cl1_match = True
+                    break
+            if cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
+                        comb_obj_name, cl1_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 ok
+                            logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
+                                comb_obj_name, cl1_name, cl2_name)
+                            break      
+            # if not cl1_match or not cl2_match:
+            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
+
+        # cl1 false and cl2 true
+        elif comb_obj_cl1 == 'false' and comb_obj_cl2 == 'true':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
+                    cl1_match = True
+                    break
+            if cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
+                        comb_obj_name, cl1_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            # comb_obj_no_match.append(comb_obj_name) # cl1 ok, !cl2 ok
+                            break
+                    if not cl2_match:
+                        comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 ko
+                        logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
+                            comb_obj_name, cl1_name, cl2_name)
+            # if not cl1_match:
+            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
+
+        # cl1 true and cl2 false
+        elif comb_obj_cl1 == 'true' and comb_obj_cl2 == 'false':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
+                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
+                    cl1_match = True
+                    break
+            if not cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # !cl1 ko && cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            comb_obj_match.append(comb_obj_name) # !cl1 ko, cl2 ok
+                            logging.info("Comb-obj match. Name '%s'  Negate cl1, cl2 '%s'",\
+                                comb_obj_name, cl2_name)
+                            break
+                    # if not cl2_match:
+                    #     comb_obj_no_match.append(comb_obj_name) # !cl1 ko && cl2 ko
+
+        # cl1 true and cl2 true
+        else:
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
+                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
+                    cl1_match = True
+                    break
+            if not cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # !cl1 ko && !cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            # comb_obj_no_match.append(comb_obj_name) # !cl1 ko, !cl2 ok
+                            break
+                    if not cl2_match:
+                        comb_obj_match.append(comb_obj_name) # !cl1 ko, !cl2 ko
+                        logging.info("Comb-obj match. Name '%s'  Negate cl1 '%s' & cl2 '%s'",\
+                                comb_obj_name, cl1_name, cl2_name)
+
+    return comb_obj_match
 
 
-def get_comb_obj_content(name):
-    """ 
-    Search content of combinated object and return array
+def get_xml_dst_object_match(root, destination):
     """
-
-    logging.debug("Exec: get_comb_obj_content() for '" + name + "'")
-
-    root = get_xml_root()
-    comb_obj_content = []
-
-    for content in root.find('conditionObjects/comb-obj[@name="'+name+'"]').iter('c-l-1'):
-        comb_obj_content.append(content.attrib.get('n'))
-
-    return comb_obj_content
-
-
-def get_proxy_port_xml(proxy_object):
+    Description:
+        Search match in destination objects (ipobject, a-url, categorylist4).
+    Input:
+        root        - (XML Element) XML root.
+        
+    Output:
+        match_dst_objects - (str List) Name of XML objects that matches.
     """
-    Get proxy port from proxy object name.
-    Return number port (int)
-    """
+    logging.debug("Exec: get_xml_dst_object_match()")
+    logging.debug("Destination: %s",destination)
 
-    logging.debug("Exec: get_proxy_port_xml() for '" + proxy_object + "'")
+    match_dst_objects = []
 
-    root = get_xml_root()
-    proxy_port_xml = int(root.find("conditionObjects/proxy[@name='"+proxy_object+"']").attrib.get('port'))
-    return proxy_port_xml
+    # vpm categories
+    if ONLINE:
+        if destination.geturl().startswith("//"):
+            categories = get_online_categories(destination.geturl().strip("//"))
+        else:
+            categories = get_online_categories(destination.geturl())
+        categories_custom   = categories[0].rsplit('; ')
+        categories_bluecoat = categories[1].rsplit('; ')
+        logging.info("Object match. vpm-cat %s; %s",categories_custom,categories_bluecoat)
+        if not categories_custom == ['none']:
+            for category in categories_custom:
+                match_dst_objects.append(category)
+        if not categories_bluecoat == ['none']:
+            for category in categories_bluecoat:
+                match_dst_objects.append(category)
+    else: #WIP
+        # If online not search <node> (vpm cat)
+        categories_custom = [] #WIP
+        match_dst_objects.append(categories_custom)
 
+    # categorylist4
+    for category in root.findall('conditionObjects/categorylist4'):
+        category_name = category.attrib.get('name')
+        for cat_i in category.findall('sel/i'):
+            cat_i_name = cat_i.text
+            if cat_i_name in match_dst_objects:
+                match_dst_objects.append(category_name)
+                logging.info("Object match. Name '%s'  cat <i> '%s'", category_name, cat_i_name)
+        for cat_ai in category.findall('sel/ai'):
+            cat_ai_name = cat_ai.attrib.get('n')
+            if cat_ai_name in match_dst_objects:
+                match_dst_objects.append(category_name)
+                logging.info("Object match. Name '%s'  cat <ai> '%s'", category_name, cat_ai_name)
 
-def get_auth_group_base(group_name):
-    """
-    Get authentication group-base from group name.
-    Return group-base (String)
-    """
+    # a-url
+    for a_url_object in root.findall("conditionObjects/a-url"):
+        a_url_object_name = a_url_object.attrib.get('name')
+        xml_h = a_url_object.attrib.get('h')
+        xml_p = a_url_object.attrib.get('p')
+        xml_d = a_url_object.attrib.get('d')
 
-    logging.debug("Exec: get_auth_group_base() for '" + group_name + "'")
+        if not xml_h == None:
+            xml_h_t = a_url_object.attrib.get('h-t')
+            if xml_h_t == 'exact-phrase':
+                if not destination.hostname == xml_h:
+                    continue
+            elif xml_h_t == 'at-end':
+                if not destination.hostname.endswith(xml_h):
+                    continue
+            elif xml_h_t == 'at-beginning':
+                if not destination.hostname.startswith(xml_h):
+                    continue
+            elif xml_h_t == 'regex':
+                if not re.match(xml_h, destination.hostname):
+                    continue
+            elif xml_h_t == 'contains':
+                if not xml_h in destination.hostname:
+                    continue
+            else:
+                logging.warning("a-url '%s' host condition (h-t in xml) not implemented in get_a_url_match()",xml_h_t)
 
-    root = get_xml_root()
-    auth_group_base = root.find('conditionObjects/group').attrib.get('group-base')
-    return auth_group_base
+        if not xml_p == None:
+            xml_p_t = a_url_object.attrib.get('p-t')
+            if xml_p_t == 'exact-phrase':
+                if destination.path == xml_p:
+                    match_dst_objects.append(a_url_object_name)
+                    logging.info("Object match. Name '%s'  ", a_url_object_name)
+                continue
+            elif xml_p_t == 'at-end':
+                if destination.path.endswith(xml_p):
+                    match_dst_objects.append(a_url_object_name)
+                    logging.info("Object match. Name '%s'  ", a_url_object_name)
+                continue
+            elif xml_p_t == 'at-beginning':
+                if destination.path.startswith(xml_p):
+                    match_dst_objects.append(a_url_object_name)
+                    logging.info("Object match. Name '%s'  ", a_url_object_name)
+                continue
+            elif xml_p_t == 'regex':
+                if bool(re.match(xml_p, destination.path)):
+                    match_dst_objects.append(a_url_object_name)
+                    logging.info("Object match. Name '%s'  ", a_url_object_name)
+                continue
+            elif xml_p_t== 'contains':
+                if xml_p in destination.path:
+                    match_dst_objects.append(a_url_object_name)
+                    logging.info("Object match. Name '%s'  ", a_url_object_name)
+                continue
+            else:
+                logging.warning("a-url '%s' path condition (p-t in xml) not implemented in get_xml_dst_object_match()",xml_p_t)
+                continue
+        
+        # Simple match
+        if not xml_d == None:
+            if xml_d in destination.hostname:
+                match_dst_objects.append(a_url_object_name)
+                logging.info("Object match. Name '%s'  ", a_url_object_name)
+            continue
 
+        # Advanced match without xml_p
+        else:
+            match_dst_objects.append(a_url_object_name)
+            logging.info("Object match. Name '%s'  ", a_url_object_name)
 
-def get_categorylist4_content(categorylist4_name):
-    """
-    Get vpm-cat in categorylist4 object.
-    Return vpm_cat_list (string array) 
-    """
+        # if input_src in ipaddress.ip_network(ipobject.attrib.get('value'), False):
+        #     ipobject_name = ipobject.attrib.get('name')
+        #     ipobject_subnet = ipobject.attrib.get('value')
+        #     match_src_objects.append(ipobject_name)
+        #     logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
 
-    logging.debug("Exec: get_categorylist4_content() for '" + categorylist4_name + "'")
-
-    root = get_xml_root()
-    vpm_cat_list = []
-    vpm_cat_list_xml = root.findall("conditionObjects/categorylist4[@name='" + categorylist4_name + "']/sel/i")
-    for vpm_cat in vpm_cat_list_xml:
-        vpm_cat_list.append(vpm_cat.text)
-
-    return vpm_cat_list
+    # ipobject
+    try:
+        dest_ip = ipaddress.ip_address(destination.netloc)
+        for ipobject in root.findall('conditionObjects/ipobject'):
+            if dest_ip in ipaddress.ip_network(ipobject.attrib.get('value'), False):
+                ipobject_name = ipobject.attrib.get('name')
+                ipobject_subnet = ipobject.attrib.get('value')
+                match_dst_objects.append(ipobject_name)
+                logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
+    except ValueError as e:
+        logging.debug("Input get_xml_dst_object_match() is not ipadress:" + str(e))
+    
+    return match_dst_objects
+    
+    # Search comb-obj
 
 
 def get_auth_obj_match(auth_obj_name):
@@ -664,17 +912,15 @@ def get_auth_obj_match(auth_obj_name):
     Check if xml auth-obj match with selected AUTH_METHOD (group in xml)
     Return boolean
     """
-
-    logging.debug("Exec: get_auth_obj_match()")
+    logging.debug("Exec: get_auth_obj_match(%s)", auth_obj_name)
 
     root = get_xml_root()
     realm_search = root.find("conditionObjects/auth-obj[@name='" + auth_obj_name + "']").attrib.get('r-n')
 
     if AUTH_METHOD == '':
         return False
-    else:
-        realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
 
+    realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
     if realm_search == realm_select:
         return True
     else:
@@ -694,60 +940,13 @@ def get_adm_auth_obj_match(auth_obj_name):
 
     if AUTH_METHOD == '':
         return False
-    else: 
+    else:
         realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
-    
+
     if realm_search == realm_select:
         return True
     else:
         return False
-
-
-def get_a_url_match(xml_object_name, destination):
-    """
-    Check if xml a-url match with input destination
-    Return boolean
-    """
-
-    logging.debug("Exec: get_a_url_match() for '" + xml_object_name + "'")
-    root = get_xml_root()
-
-    xml_h = root.find("conditionObjects/a-url[@name='" + xml_object_name + "']").attrib.get('h')
-    xml_p = root.find("conditionObjects/a-url[@name='" + xml_object_name + "']").attrib.get('p')
-
-    if not xml_h == None:
-        xml_h_t = root.find("conditionObjects/a-url[@name='" + xml_object_name + "']").attrib.get('h-t')
-        if xml_h_t == 'exact-phrase':
-            if not destination.hostname == xml_h: return False
-        elif xml_h_t == 'at-end':
-            if not destination.hostname.endswith(xml_h): return False
-        elif xml_h_t == 'at-beginning':
-            if not destination.hostname.startswith(xml_h): return False
-        elif xml_h_t == 'regex':
-            if not re.match(xml_h, destination.hostname): return False
-        elif xml_h_t == 'contains':
-            if not xml_h in destination.hostname: return False
-
-        else:
-            logging.warning("a-url '" + xml_h_t + "' host condition (h-t in xml) not implemented in get_a_url_match()")
-
-    if not xml_p == None:
-        xml_p_t = root.find("conditionObjects/a-url[@name='" + xml_object_name + "']").attrib.get('p-t')
-        if xml_p_t == 'exact-phrase':
-            return destination.path == xml_p
-        elif xml_p_t == 'at-end':
-            return destination.path.endswith(xml_p)
-        elif xml_p_t == 'at-beginning':
-            return destination.path.startswith(xml_p)
-        elif xml_p_t == 'regex': 
-            return bool(re.match(xml_p, destination.path))
-        elif xml_p_t== 'contains':
-            return xml_p in destination.path
-        else:
-            logging.warning("a-url '" + xml_p_t + "' path condition (p-t in xml) not implemented in get_a_url_match()")
-            return False
-    else:
-        return True
 
 # OK
 def get_xml_policy_layers(root):
@@ -757,7 +956,7 @@ def get_xml_policy_layers(root):
     Input:
         root            - (XML Element) XML root
     Output:
-        layers_enabled  - (XML List) Policy layers enabled
+        layers_enabled  - (XML Element List) Policy layers enabled
     """
     logging.debug("Exec: get_xml_policy_layers()")
 
@@ -772,173 +971,162 @@ def get_xml_policy_layers(root):
 
     return layers_enabled
 
-
-
-def get_xml_src_row_match():
-    """
-    """
-
-def get_rows_src_match(layer, match_ipobjects, match_comb_obj, search_dst, dst_categories, input_dest):
+# OK
+def evaluate_action(row):
     """
     Description:
-        Check if src match in layers
+        Return if action permit (True) or deny (False) traffic.
     Input:
-        search_dst  - (Boolean) True, check destination get_rows_dst_match()
-                                False, print match row print_layer_row() 
+        row - (XML Element) row with match.
+    Output:
+        Boolean / None
+    """
+    col_ac = row.find('colItem[@id="ac"]').attrib.get('name')
+
+    # Evaluate action
+    allow_actions   = ["Do Not Authenticate", "Allow"]
+    deny_action     = ["Force Deny (Content Filter)", "Force Deny"]
+
+    if col_ac in allow_actions:
+        return True
+    if col_ac in deny_action:
+        return False
+
+    dst_object_type = get_xml_object_type(col_ac)
+    if dst_object_type == 'auth-obj':
+        return get_auth_obj_match(col_ac)
+    if dst_object_type == 'adm-auth-obj':
+        if get_adm_auth_obj_match(col_ac):
+            return True
+        else:
+            return False
+    if dst_object_type == 'acc-log-fac':
+        return None
+    if dst_object_type == 'dny-exc':
+        return None
+    if dst_object_type == 'effective-threat-risk-lvl':
+        return None
+    else:
+        msg_wrn("Warning: Action not evaluated. See logs for more information")
+        logging.warning("Object type '%s' not parsing in evaluate_action()", dst_object_type)
+
+# OK
+def get_rows_src_match(layer, match_src_objects, match_comb_obj):
+    """
+    Description:
+        Check if src match in layers.
+    Input:
+        layer               - (XML Element) Layer to inspect.
+        match_src_objects   - (str List)    XML objects Name that matches with input.
+        match_comb_obj      - (str List)    XML comb-obj Name that matches with match_src_objects.
+    Output:
+        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
     """
     logging.debug("Exec: get_rows_src_match()")
 
-    # Check guard
-    # guard = layer.find('guard') 
+    # Init array
+    match_array_src = []
+
+    # Check guard #WIP
+    # guard = layer.find('guard')
     # if not guard == None:
     #     if not row.attrib.get('enabled') == 'false':
-
 
     # Get rows enabled in layer
     for row in layer.findall('rowItem'):
         if not row.attrib.get('enabled') == 'false':
             row_src = row.find('colItem[@id="so"]').attrib.get('name')
 
-            # Check if src is any, ipobject or comb-obj first level
-            if row_src == 'Any' or row_src in match_ipobjects or row_src in match_comb_obj:
-                if not search_dst:
-                    print_layer_row(layer, row, search_dst)
-                else:
-                    get_rows_dst_match(layer, row, dst_categories, input_dest)
-
+            # Check source match
+            if row_src == 'Any' or row_src in match_src_objects or row_src in match_comb_obj:
+                action = evaluate_action(row)
+                match_array_src.append([layer, row, action])
             else:
-                object_type = get_xml_object_type(row_src)          
-                if object_type == 'comb-obj':
-                    comb_obj = get_comb_obj_content(row_src)
-                    for c_l_1 in comb_obj:
-                        c_l_1_type = get_xml_object_type(c_l_1)
+                object_type = get_xml_object_type(row_src)
+                if not object_type == 'comb-obj' and not object_type == 'proxy'\
+                    and not object_type == 'group' and not object_type == 'ipobject':
+                    msg_wrn("Warning: Object not evaluated. See logs for more information")
+                    logging.warning("Object type '%s' not parsing in get_rows_src_match(%s)", object_type, row_src)
 
-                        if c_l_1_type == 'comb-obj':
-                            if c_l_1 in match_comb_obj:
-                                if not search_dst:
-                                    print_layer_row(layer, row, search_dst)
-                                else:
-                                    print("WIP")
+    return match_array_src
 
-                        elif c_l_1_type == 'proxy':
-                            proxy_port_xml = get_proxy_port_xml(c_l_1)
-                            if proxy_port_xml == PROXY_PORT:
-                                if not search_dst:
-                                    print_layer_row(layer, row, search_dst)
-                                else:
-                                    print("WIP")
-                            
-                        else:
-                            if not c_l_1_type == 'ipobject': # ignore ipobject in comb-obj (first level). Already in match_comb_obj
-                                logging.warning("Object type '" +c_l_1_type + "' not parsing in get_rows_src_match() comb-obj loop")
-
-                elif object_type == 'proxy':
-                    proxy_port_xml = get_proxy_port_xml(row_src)
-                    if proxy_port_xml == PROXY_PORT:
-                        if not search_dst:
-                            print_layer_row(layer, row, search_dst)
-                        else:
-                            print("WIP")
-
-                elif object_type == 'group':
-                    auth_group_base = get_auth_group_base(row_src)
-                    if auth_group_base == AUTH_METHOD:
-                        if not search_dst:
-                            print_layer_row(layer, row, search_dst)
-                        else:
-                            print("WIP")
-
-                else:
-                    if not object_type == 'ipobject': # Ignore ipobjects. Already in match_ipobjects
-                        logging.warning("Object type '" +object_type + "' not parsing in get_rows_src_match()")
-
-
-def get_rows_dst_match(layer, row, dst_categories, input_dest):
+# OK
+def get_rows_dst_match(match_array_src, match_dst_objects):
     """
-    Check if input dst match with row destination.
-    If match print layer row print_layer_row()
+    Description:
+        Check if dst match in layers.
+    Input:
+        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
+        match_src_objects   - (str List)    XML objects Name that matches with input.
+    Output:
+        match_array_dst     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
     """
-
     logging.debug("Exec: get_rows_dst_match()")
-    row_dst = row.find('colItem[@id="de"]').attrib.get('name')
 
-    if row_dst == 'Any' or row_dst in dst_categories:
-        print_layer_row(layer, row, True)
+    match_array_dst = []
 
-    else:
-        object_type = get_xml_object_type(row_dst)
-
-        if object_type == 'categorylist4':
-            dst_row_cats = get_categorylist4_content(row_dst)
-            for dst_row_cat in dst_row_cats:
-                if dst_row_cat in dst_categories:
-                    print_layer_row(layer, row, True)
-
-        elif object_type == 'a-url':
-            if get_a_url_match(row_dst, input_dest):
-                print_layer_row(layer, row, True)
-
-        elif object_type == 'comb-obj':
-            comb_obj = get_comb_obj_content(row_dst)
-            for c_l_1 in comb_obj:
-                c_l_1_type = get_xml_object_type(c_l_1)
-
-                if c_l_1_type == 'categorylist4':
-                    dst_row_cats = get_categorylist4_content(c_l_1)
-                    for dst_row_cat in dst_row_cats:
-                        if dst_row_cat in dst_categories:
-                            print_layer_row(layer, row, True)
-                elif c_l_1_type == 'a-url':
-                    if get_a_url_match(c_l_1, input_dest):
-                        print_layer_row(layer, row, True)
-                else:
-                    logging.warning("Object type '" +c_l_1_type + "' with name '" + c_l_1 + "' not parsing in get_rows_dst_match() com-obj loop")
-
+    for match in match_array_src:
+        layer  = match[0]
+        row    = match[1]
+        action = match[2]
+        row_dst = row.find('colItem[@id="de"]').attrib.get('name')
+        # print(row_dst) #DELETEME
+        if row_dst == 'Any' or row_dst in match_dst_objects:
+            match_array_dst.append([layer, row, action])
         else:
-            logging.warning("Object type '" +object_type + "' with name '" + row_dst + "' not parsing in get_rows_dst_match()")
+            object_type = get_xml_object_type(row_dst)
+            # Bypass threat-risk and svr-cert objects
+            if object_type == 'threat-risk' or object_type == 'svr-cert':
+                match_array_dst.append([layer, row, action])
+            elif not object_type == 'node' and not object_type == 'a-url'\
+            and not object_type == 'categorylist4'and not object_type == 'ipobject'\
+            and not object_type == 'comb-obj':
+                msg_wrn("Warning: Object not evaluated. See logs for more information")
+                logging.warning("Object type '%s' not parsing in get_rows_dst_match(%s)", object_type, row_dst)
+    
+    return match_array_dst
 
-
-def print_layer_row(layer, row, search_dst):
+# OK
+def print_layer_row(match_array):
     """
-    Print match row
-    If search_dst == True, check if action is ✓ or X and print
+    Description:
+        Print match layers in table format
+    Input:
+        match_array - (List) [layer, row, action]
     """
+    logging.debug("Exec print_layer_row()")
 
-    layer_name = layer.find('name').text.strip(' \n\t')
-    col_no = row.find('colItem[@id="no"]').attrib.get('value')
-    col_so = row.find('colItem[@id="so"]').attrib.get('name')
-    col_de = row.find('colItem[@id="de"]').attrib.get('name')
-    col_ac = row.find('colItem[@id="ac"]').attrib.get('name')
-    col_co = row.find('colItem[@id="co"]').attrib.get('name')
+    # Define static print values
+    headers         = ["", "Layer", "Row", "Src", "Dst", "Action", "Description"]
+    action_allow    = f"{bcolors.GREEN}✓{bcolors.RESET}"
+    action_deny     = f"{bcolors.RED}X{bcolors.RESET}"
+    action_unknown  = f"{bcolors.YELLOW}?{bcolors.RESET}"
 
-    match = ''
-    if search_dst:
-        if col_ac == 'Do Not Authenticate': match = '✓'
-        elif col_ac == 'Allow': match = '✓'
-        elif col_ac == 'Force Deny (Content Filter)': match = 'X'
-        elif col_ac == 'Force Deny': match = 'X'
-        else: 
-            dst_object_type = get_xml_object_type(col_ac)
+    # Init print array
+    print_array = []
+    for match in match_array:
+        # Get layer and row data
+        layer_name  = match[0].find('name').text.strip(' \n\t')
+        col_no      = match[1].find('colItem[@id="no"]').attrib.get('value')
+        col_so      = match[1].find('colItem[@id="so"]').attrib.get('name')
+        col_de      = match[1].find('colItem[@id="de"]').attrib.get('name')
+        col_ac      = match[1].find('colItem[@id="ac"]').attrib.get('name')
+        col_co      = match[1].find('colItem[@id="co"]').attrib.get('name')
 
-            if dst_object_type == 'auth-obj':
-                if get_auth_obj_match(col_ac):
-                    match = '✓'
-                else:
-                    match = 'X'
-            elif dst_object_type == 'adm-auth-obj':
-                if get_adm_auth_obj_match(col_ac):
-                    match = '✓'
-                else:
-                    match = 'X'
-            else:
-                logging.warning("Object type '" +dst_object_type + "' not parsing in print_layer_row()")
-    else:
-        col_so = f"{bcolors.BLUE}" + col_so + f"{bcolors.RESET}"
+        # Set print action
+        if match[2]:
+            action = action_allow
+        elif match[2] == False:
+            action = action_deny
+        else:
+            action = action_unknown
 
+        # Generate array for tabulate output
+        print_array.append([action,layer_name,col_no,col_so,col_de,col_ac,col_co])
 
-    logging.info("Match on Layer: " + layer_name + " Row: " + col_no + " Src: " + col_so)
-    print("\n[" + match + "] Layer '" + layer_name + "' Row '" + col_no + "'")
-    print(f"Src '" + col_so + "' Dst '" + col_de + "' Action '" + col_ac + "' Description '" + col_co + "'")
+    # Print
+    print(tabulate(print_array, headers))
+    print()
 
 
 ##############################
