@@ -15,7 +15,7 @@ Limitations
 -----------
     Only check UserAuthenticationPolicyTable & WebAccessPolicyTable layers
     Not check Threat Risk Level (TL) (Not available in API)
-    Not check ip-address in proxy object
+    Not check ip-address in "Proxy IP Address/Port" object
 """
 
 # Import dependencies
@@ -35,11 +35,8 @@ from vars import *
 # Disable HTTPS server certificate exception terminal output
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Global variables
-PROXY_PORT = proxy_port
-
 # Define Colors
-class bcolors:
+class Bcolors:
     """Output colors"""
     BLUE    = '\033[1;36m'
     GREEN   = '\033[92m'
@@ -51,7 +48,7 @@ class bcolors:
 
 # Check python version
 if sys.version_info[0] < 3:
-    sys.exit(f"{bcolors.RED}Upgrade Python version{bcolors.RESET}")
+    sys.exit(f"{Bcolors.RED}Upgrade Python version{Bcolors.RESET}")
 
 # Set Log
 if sys.version_info[1] < 9:
@@ -64,11 +61,11 @@ else:
 
 # Init Banner
 print()
-print(f"{bcolors.BLUE}")
+print(f"{Bcolors.BLUE}")
 print("#####################################")
 print("##  Symantec ProxySG Utility Tool  ##")
 print("#####################################")
-print(f"{bcolors.GREEN}", end="")
+print(f"{Bcolors.GREEN}", end="")
 print("https://github.com/sburgosl")
 print()
 
@@ -81,20 +78,20 @@ logging.debug("START SCRIPT")
 def main():
     """
     Description:
-        Main menu
+        Main menu.
     """
     logging.debug("Exec: main()")
 
     print()
-    print(f"{bcolors.BLUE}[GLOBAL VARIABLES]{bcolors.RESET}")
+    print(f"{Bcolors.BLUE}[GLOBAL VARIABLES]{Bcolors.RESET}")
     print("Auth method: " + AUTH_METHOD)
     print("Proxy Port: " + str(PROXY_PORT))
     print("Exclude layers: " + str(EXCLUDE_LAYERS))
     print()
-    print(f"{bcolors.BLUE}[OPTIONS]{bcolors.RESET}")
+    print(f"{Bcolors.BLUE}[OPTIONS]{Bcolors.RESET}")
     print("[1]: Search source IP match")
-    print(f"[2]: {bcolors.RED}[WIP]{bcolors.RESET}Search destination (IP/FQDN/URL)")
-    print(f"[3]: {bcolors.YELLOW}[Testing]{bcolors.RESET}Search source/destination")
+    print(f"[2]: {Bcolors.RED}[WIP]{Bcolors.RESET}Search destination (IP/FQDN/URL)")
+    print(f"[3]: {Bcolors.YELLOW}[Testing]{Bcolors.RESET}Search source/destination")
     print("[4]: Get / Select authentication")
     print("[5]: Select proxy port")
     print("[6]: Download policy xml")
@@ -114,15 +111,15 @@ def main():
         }
         switcher.get(option, main)()
 
-    except ValueError as e:
+    except ValueError as error:
         msg_wrn("Not valid input")
-        logging.warning("Not int on main() input: " + str(e))
+        logging.warning("Not int on main() input: %s",error)
 
     except KeyboardInterrupt:
         sys.exit("")
 
-    except Exception as e:
-        logging.critical(e)
+    except Exception as error:
+        logging.critical(error)
         sys.exit('Error')
 
     main()
@@ -131,11 +128,11 @@ def main():
 ##############################
 # [1]: Search source IP match
 ##############################
-# OK
+
 def menu_search_source_ip():
     """
     Description:
-        Dispalys the policy rules that match with a source IP
+        Dispalys the policy rules that match with a source IP.
     """
     logging.debug("Exec: menu_search_source_ip()")
 
@@ -250,7 +247,8 @@ def search_complete():
 
 def edit_auth():
     """
-    List and select authentication groups
+    Description:
+        List and select authentication groups.
     """
 
     logging.debug("Exec: edit_auth()")
@@ -346,7 +344,7 @@ def menu_download_policy():
         print("Enter Version: ", end="")
         revision = input()
         get_proxy_policy_download(user, password, policy_uuid, revision)
-        print(f"{bcolors.GREEN}[OK]{bcolors.RESET}")
+        print(f"{Bcolors.GREEN}[OK]{Bcolors.RESET}")
 
     main()
 
@@ -371,14 +369,14 @@ def get_proxy_policies(user, password):
             return req.json()
 
         elif req.status_code == 401:
-            sys.exit(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
+            sys.exit(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
 
         elif req.status_code == 403:
-            sys.exit(f"{bcolors.RED}Forbidden{bcolors.RESET}")
+            sys.exit(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
 
         else:
             logging.error("Status Code not handled in get_proxy_policies()")
-            sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+            sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
     except ValueError as e:
         logging.error("Error in response in get_proxy_policies()" + str(e))
@@ -389,7 +387,7 @@ def get_proxy_policies(user, password):
     except Exception as e:
         logging.error("Error not handled in get_proxy_policies(): " + str(e))
 
-    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
 # OK
 def get_proxy_policy_versions(user, password, policy_uuid):
@@ -413,9 +411,9 @@ def get_proxy_policy_versions(user, password, policy_uuid):
             return req.json()
 
         elif req.status_code == 401:
-            print(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
+            print(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
         elif req.status_code == 403:
-            print(f"{bcolors.RED}Forbidden{bcolors.RESET}")
+            print(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
         else:
             logging.error("Status Code not handled in get_proxy_policy_versions()")
 
@@ -428,7 +426,7 @@ def get_proxy_policy_versions(user, password, policy_uuid):
     except Exception as e:
         logging.error("Error not handled in get_proxy_policy_versions(): " + str(e))
 
-    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
 # OK
 def get_proxy_policy_download(user, password, policy_uuid, revision):
@@ -456,9 +454,9 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
             return
 
         elif req.status_code == 401:
-            print(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
+            print(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
         elif req.status_code == 403:
-            print(f"{bcolors.RED}Forbidden{bcolors.RESET}")
+            print(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
         else:
             logging.error("Status Code not handled in get_proxy_policy_download()")
 
@@ -471,7 +469,7 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
     except Exception as e:
         logging.error("Error not handled in get_proxy_policy_versions(): " + str(e))
 
-    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
 
 ##############################
@@ -534,14 +532,14 @@ def get_proxy_categories(user, password, destination):
             return rtext
 
         elif req.status_code == 401:
-            sys.exit(f"{bcolors.RED}Authentication Error{bcolors.RESET}")
+            sys.exit(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
 
         elif req.status_code == 403:
-            sys.exit(f"{bcolors.RED}Forbidden{bcolors.RESET}")
+            sys.exit(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
 
         else:
             logging.error("Status Code not handled in get_proxy_categories()")
-            sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+            sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
     except ValueError as e:
         logging.error("Error in response in get_proxy_categories()" + str(e))
@@ -552,7 +550,7 @@ def get_proxy_categories(user, password, destination):
     except Exception as e:
         logging.error("Error not handled in get_proxy_categories(): " + str(e))
 
-    sys.exit(f"{bcolors.RED}Connection Error{bcolors.RESET}: see logs for more info")
+    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
 
 ##############################
@@ -574,7 +572,7 @@ def get_xml_root():
 
     except OSError as e:
         logging.error("No such file in get_xml_root() " + str(e))
-        sys.exit(f"{bcolors.RED}No such xml file{bcolors.RESET}: Edit variable FILE_PATH in vars.py file or download with option [6]")
+        sys.exit(f"{Bcolors.RED}No such xml file{Bcolors.RESET}: Edit variable FILE_PATH in vars.py file or download with option [6]")
 
 
 def get_xml_object_type(object_search):
@@ -678,7 +676,7 @@ def get_xml_com_obj_match(root, match_src_objects):
                             comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 ok
                             logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
                                 comb_obj_name, cl1_name, cl2_name)
-                            break      
+                            break
             # if not cl1_match or not cl2_match:
             #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
 
@@ -771,7 +769,7 @@ def get_xml_dst_object_match(root, destination):
         Search match in destination objects (ipobject, a-url, categorylist4).
     Input:
         root        - (XML Element) XML root.
-        
+
     Output:
         match_dst_objects - (str List) Name of XML objects that matches.
     """
@@ -871,7 +869,7 @@ def get_xml_dst_object_match(root, destination):
             else:
                 logging.warning("a-url '%s' path condition (p-t in xml) not implemented in get_xml_dst_object_match()",xml_p_t)
                 continue
-        
+
         # Simple match
         if not xml_d == None:
             if xml_d in destination.hostname:
@@ -901,10 +899,8 @@ def get_xml_dst_object_match(root, destination):
                 logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
     except ValueError as e:
         logging.debug("Input get_xml_dst_object_match() is not ipadress:" + str(e))
-    
+
     return match_dst_objects
-    
-    # Search comb-obj
 
 
 def get_auth_obj_match(auth_obj_name):
@@ -1083,7 +1079,7 @@ def get_rows_dst_match(match_array_src, match_dst_objects):
             and not object_type == 'comb-obj':
                 msg_wrn("Warning: Object not evaluated. See logs for more information")
                 logging.warning("Object type '%s' not parsing in get_rows_dst_match(%s)", object_type, row_dst)
-    
+
     return match_array_dst
 
 # OK
@@ -1098,9 +1094,9 @@ def print_layer_row(match_array):
 
     # Define static print values
     headers         = ["", "Layer", "Row", "Src", "Dst", "Action", "Description"]
-    action_allow    = f"{bcolors.GREEN}✓{bcolors.RESET}"
-    action_deny     = f"{bcolors.RED}X{bcolors.RESET}"
-    action_unknown  = f"{bcolors.YELLOW}?{bcolors.RESET}"
+    action_allow    = f"{Bcolors.GREEN}✓{Bcolors.RESET}"
+    action_deny     = f"{Bcolors.RED}X{Bcolors.RESET}"
+    action_unknown  = f"{Bcolors.YELLOW}?{Bcolors.RESET}"
 
     # Init print array
     print_array = []
@@ -1138,7 +1134,7 @@ def print_start():
     Description:
         Print start banner for display matched rules
     """
-    print(f"{bcolors.BLUE}\n-----------------------[START]-----------------------{bcolors.RESET}")
+    print(f"{Bcolors.BLUE}\n-----------------------[START]-----------------------{Bcolors.RESET}")
 
 # OK
 def print_end():
@@ -1146,7 +1142,7 @@ def print_end():
     Description:
         Print end banner for display matched rules
     """
-    print(f"{bcolors.BLUE}\n------------------------[END]------------------------\n{bcolors.RESET}")
+    print(f"{Bcolors.BLUE}\n------------------------[END]------------------------\n{Bcolors.RESET}")
 
 # OK
 def msg_sys(message):
@@ -1156,7 +1152,7 @@ def msg_sys(message):
     Input:
         message - (String) message to output
     """
-    sys.exit(f"{bcolors.RED}" + message + f"{bcolors.RESET}")
+    sys.exit(f"{Bcolors.RED}" + message + f"{Bcolors.RESET}")
 
 # OK
 def msg_wrn(message):
@@ -1166,7 +1162,7 @@ def msg_wrn(message):
     Input:
         message - (String) message to output
     """
-    print(f"{bcolors.YELLOW}" + message + f"{bcolors.RESET}")
+    print(f"{Bcolors.YELLOW}" + message + f"{Bcolors.RESET}")
 
 # OK
 if __name__ == "__main__":
