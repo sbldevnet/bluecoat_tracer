@@ -47,7 +47,7 @@ class Bcolors:
 
 # Check python version
 if sys.version_info[0] < 3:
-    sys.exit(f"{Bcolors.RED}Upgrade Python version{Bcolors.RESET}")
+    sys.exit(f"{Bcolors.RED}Upgrade Python Version{Bcolors.RESET}")
 
 # Set Log
 if sys.version_info[1] < 9:
@@ -299,7 +299,6 @@ def edit_proxy_port():
 # [6]: menu_download_policy
 ##############################
 
-# OK
 def menu_download_policy():
     """
     Description:
@@ -318,121 +317,142 @@ def menu_download_policy():
         user = input()
         print("Enter Pass: ", end="")
         password = getpass()
-        policies = get_proxy_policies(user,password)
         print()
+        
+        # Get policies
+        loop = True
+        while loop:
+            policies = get_proxy_policies(user,password)
+            if policies == "error":
+                return
+            loop = False
+        
+        # Print policies and Ask uuid
+        loop = True
+        while loop:
+            for policy in policies:
+                print("Policy uuid: '" + policy['uuid'] + "' Name: '" + policy['name'] + "' Desc: '" + policy['description'] + "'")
+            print("Enter Policy uuid: ", end="")
+            policy_uuid = input()
 
-        for policy in policies:
-            print("Policy uuid: '" + policy['uuid'] + "' Name: '" + policy['name'] + "' Desc: '" + policy['description'] + "'")
+            # Get Versions
+            versions = get_proxy_policy_versions(user, password, policy_uuid)
+            if versions == "error":
+                return
+            if not versions == "retry":
+                loop = False
 
-        # Ask uuid
-        print("Enter Policy uuid: ", end="")
-        policy_uuid = input()
-        versions = get_proxy_policy_versions(user, password, policy_uuid)
-        for version in versions:
-            print("Version: '" + version['revisionNumber'] + "' Date: '" + version['revisionDate'] + "' : '" + version['revisionDescription'] + "'")
+        # Print versions and ask version number
+        loop = True
+        while loop:
+            for version in versions:
+                print("Version: '" + version['revisionNumber'] + "' Date: '" + version['revisionDate'] + "' : '" + version['revisionDescription'] + "'")
+            print("Enter Version: ", end="")
+            revision = input()
+            
+            # Get policy
+            policy_download = get_proxy_policy_download(user, password, policy_uuid, revision)
+            if not policy_download == "retry":
+                loop = False
 
-        # Ask version
-        print("Enter Version: ", end="")
-        revision = input()
-        get_proxy_policy_download(user, password, policy_uuid, revision)
         print(f"{Bcolors.GREEN}[OK]{Bcolors.RESET}")
 
-# OK
 def get_proxy_policies(user, password):
     """
     Description:
         List and select policy from Symantec Management Center using API
     Input:
-        user        - (String) user of symantec management center
-        password    - (String) password of symantec management center
+        user             - (str) user of symantec management center
+        password         - (str) password of symantec management center
     Output:
-        policies    - (String) json array policies response
+        policies         - (str) json array policies response or "error".
     """
     logging.debug("Exec: get_proxy_policies()")
 
     try:
-        req = requests.get(API_URL+"policies/", verify=False, auth=(user, password))
-        logging.info("HTTP Status code in get_proxy_policies() + '" + str(req.status_code) + "'")
+        url = API_URL+"policies/"
+        req = requests.get(url, verify=False, auth=(user, password))
+        logging.info("HTTP Status code in get_proxy_policies() '%s'", req.status_code)
 
         if req.status_code == 200:
             return req.json()
-
-        elif req.status_code == 401:
-            sys.exit(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
-
+        if req.status_code == 401:
+            msg_wrn("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            sys.exit(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
-
+            msg_wrn("HTTP 403: Forbidden")
+        elif req.status_code == 404:
+            msg_wrn("HTTP 404: Not Found")
         else:
             logging.error("Status Code not handled in get_proxy_policies()")
-            sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
-    except ValueError as e:
-        logging.error("Error in response in get_proxy_policies()" + str(e))
+    except ValueError as error:
+        logging.error("Error in response in get_proxy_policies(): %s", error)
+    except requests.exceptions.ConnectionError as error:
+        logging.error("Connection error in get_proxy_policies(): %s", error)
+    except Exception as error:
+        logging.error("Error not handled in get_proxy_policies(): %s", error)
 
-    except requests.exceptions.ConnectionError as e:
-        logging.error("Connection error in get_proxy_policies(): " + str(e))
+    msg_wrn("Connection Error: see logs for more info")
+    return "error"
 
-    except Exception as e:
-        logging.error("Error not handled in get_proxy_policies(): " + str(e))
-
-    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
-
-# OK
 def get_proxy_policy_versions(user, password, policy_uuid):
     """
     Description:
-        List and select policy versions from Symantec Management Center using API
+        List and select policy versions from Symantec Management Center using API.
     Input:
-        user        - (String) user of symantec management center
-        password    - (String) password of symantec management center
-        policy_uuid - (String) uuid of selected policy
+        user        - (str) user of symantec management center.
+        password    - (str) password of symantec management center.
+        policy_uuid - (str) uuid of selected policy.
     Output:
-        versions    - (String) json array versions response
+        versions    - (str List) json array versions response, or "error" / "retry".
     """
     logging.debug("Exec: get_proxy_policy_versions()")
 
     try:
-        req = requests.get(API_URL+"policies/"+policy_uuid+"/versions/", verify=False, auth=(user, password))
-        logging.info("HTTP Status code in get_proxy_policy_versions() + '" + str(req.status_code) + "'")
+        url = API_URL+"policies/"+policy_uuid+"/versions/"
+        req = requests.get(url, verify=False, auth=(user, password))
+        logging.info("HTTP Status code in get_proxy_policy_versions(): %s", req.status_code)
 
         if req.status_code == 200:
             return req.json()
-
-        elif req.status_code == 401:
-            print(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
+        if req.status_code == 401:
+            msg_wrn("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            print(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
+            msg_wrn("HTTP 403: Forbidden")
+        elif req.status_code == 404:
+            msg_wrn("HTTP 404: Not Found")
+            return "retry"
         else:
             logging.error("Status Code not handled in get_proxy_policy_versions()")
 
-    except ValueError as e:
-        logging.error("Error in response in get_proxy_policy_versions()" + str(e))
+    except ValueError as error:
+        logging.error("Error in response in get_proxy_policy_versions(): %s", error)
+    except requests.exceptions.ConnectionError as error:
+        logging.error("Connection error in get_proxy_policy_versions(): %s", error)
+    except Exception as error:
+        logging.error("Error not handled in get_proxy_policy_versions(): %s", error)
 
-    except requests.exceptions.ConnectionError as e:
-        logging.error("Connection error in get_proxy_policy_versions(): " + str(e))
+    msg_wrn("Connection Error: see logs for more info")
+    return "error"
 
-    except Exception as e:
-        logging.error("Error not handled in get_proxy_policy_versions(): " + str(e))
-
-    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
-
-# OK
 def get_proxy_policy_download(user, password, policy_uuid, revision):
     """
     Description:
-        Download and save policy xml
+        Download and save policy xml.
     Input:
-        user        - (String) user of symantec management center
-        password    - (String) password of symantec management center
-        policy_uuid - (String) uuid of selected policy
-        revision    - (String) revisionNumber of selected policy version
+        user        - (str) user of symantec management center.
+        password    - (str) password of symantec management center.
+        policy_uuid - (str) uuid of selected policy.
+        revision    - (str) revisionNumber of selected policy version.
+    Output:
+        string      - (str) Empty if it is OK. "retry" to reselect version, "error" for exit.
     """
     logging.debug("Exec: get_proxy_policy_download()")
 
     try:
-        req = requests.get(API_URL+"policies/"+policy_uuid+"/content/"+revision, verify=False, auth=(user, password))
-        logging.info("HTTP Status code in get_proxy_policy_download() + '" + str(req.status_code) + "'")
+        url = API_URL+"policies/"+policy_uuid+"/content/"+revision
+        req = requests.get(url, verify=False, auth=(user, password))
+        logging.info("HTTP Status code in get_proxy_policy_download(): %s", req.status_code)
 
         if req.status_code == 200:
             data = req.json()
@@ -442,23 +462,25 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
             file.close()
             return
 
-        elif req.status_code == 401:
-            print(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
+        if req.status_code == 401:
+            msg_wrn("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            print(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
+            msg_wrn("HTTP 403: Forbidden")
+        elif req.status_code == 404:
+            msg_wrn("HTTP 404: Not Found")
+            return "retry"
         else:
             logging.error("Status Code not handled in get_proxy_policy_download()")
 
-    except ValueError as e:
-        logging.error("Error in response in get_proxy_policy_download()" + str(e))
+    except ValueError as error:
+        logging.error("Error in response in get_proxy_policy_download(): %s", error)
+    except requests.exceptions.ConnectionError as error:
+        logging.error("Connection error in get_proxy_policy_download(): %s", error)
+    except Exception as error:
+        logging.error("Error not handled in get_proxy_policy_versions(): %s", error)
 
-    except requests.exceptions.ConnectionError as e:
-        logging.error("Connection error in get_proxy_policy_download(): " + str(e))
-
-    except Exception as e:
-        logging.error("Error not handled in get_proxy_policy_versions(): " + str(e))
-
-    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
+    msg_wrn("Connection Error: see logs for more info")
+    return "error"
 
 
 ##############################
