@@ -22,10 +22,11 @@ A clear and concise description of what you expected to happen.
 
 **Error Logs**
 Add error logs to help explain your problem.
+Please remove or mask all data of your company.
 
 **XML Policy**
 Add the custom xml policy block that causes the error.
-Please, remove all data of your company.
+Please remove or mask all data of your company.
 
 **Additional context**
 Add any other context about the problem here.
