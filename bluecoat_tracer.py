@@ -44,7 +44,6 @@ class Bcolors:
     RED     = '\033[91m'
     RESET   = '\033[0m'
     BOLD    = '\033[1m'
-    # UNDERLINE = '\033[4m'
 
 # Check python version
 if sys.version_info[0] < 3:
@@ -161,8 +160,8 @@ def menu_search_source_ip():
         print(match_comb_obj)
         print_end()
 
-    except ValueError as e:
-        logging.warning("Input menu_search_source_ip() is not ipadress:" + str(e))
+    except ValueError as error:
+        logging.warning("Input menu_search_source_ip() is not ipadress: %s",error)
         msg_wrn("Input not valid")
         menu_search_source_ip()
 
@@ -199,7 +198,7 @@ def search_complete():
 
         if input_dest.netloc == '':
             msg_wrn('[Error]: Destination is not in URL format')
-            logging.warning("Input destination search_complete() is not URL:" + str(input_dest))
+            logging.warning("Input destination search_complete() is not URL: %s",input_dest)
 
         else:
             print_start()
@@ -234,11 +233,9 @@ def search_complete():
 
             print_end()
 
-    except ValueError as e:
-        logging.warning("Input search_complete() is not ipadress:" + str(e))
+    except ValueError as error:
+        logging.warning("Input search_complete() is not ipadress: %s",error)
         search_complete()
-
-    main()
 
 
 ##############################
@@ -250,7 +247,6 @@ def edit_auth():
     Description:
         List and select authentication groups.
     """
-
     logging.debug("Exec: edit_auth()")
 
     root = get_xml_root()
@@ -271,12 +267,10 @@ def edit_auth():
         auth_select = auth_groups[int(input())].attrib.get('group-base')
         global AUTH_METHOD
         AUTH_METHOD = auth_select
-        logging.info("Change authentication method value to '" + AUTH_METHOD + "'")
+        logging.info("Change authentication method value to '%s'", AUTH_METHOD)
 
-    except IndexError as e:
-        logging.warning("Out of index on edit_auth() input: " + str(e))
-
-    main()
+    except IndexError as error:
+        logging.warning("Out of index on edit_auth() input: %s", error)
 
 
 ##############################
@@ -285,9 +279,9 @@ def edit_auth():
 
 def edit_proxy_port():
     """
-    Edit proxy_port value. Default proxy_port value is defined in vars.py file
+    Description:
+        Edit proxy_port value. Default proxy_port value is defined in vars.py file.
     """
-
     logging.debug("Exec: edit_proxy_port()")
 
     try:
@@ -295,13 +289,10 @@ def edit_proxy_port():
         global PROXY_PORT
         PROXY_PORT = int(input())
         print()
-
-        logging.info("Change proxy port value to '" + str(PROXY_PORT) + "'")
+        logging.info("Change proxy port value to '%s'",PROXY_PORT)
 
     except ValueError as error:
-        logging.warning("Not int in edit_proxy_port() input: " + str(error))
-
-    main()
+        logging.warning("Not int in edit_proxy_port() input: %s",error)
 
 
 ##############################
@@ -312,10 +303,10 @@ def edit_proxy_port():
 def menu_download_policy():
     """
     Description:
-        Get user and password
-        List and select policies
-        List and select versions
-        Download selected policy version
+        Get user and password.
+        List and select policies.
+        List and select versions.
+        Download selected policy version.
     """
     logging.debug("Exec: menu_download_policy()")
 
@@ -345,8 +336,6 @@ def menu_download_policy():
         revision = input()
         get_proxy_policy_download(user, password, policy_uuid, revision)
         print(f"{Bcolors.GREEN}[OK]{Bcolors.RESET}")
-
-    main()
 
 # OK
 def get_proxy_policies(user, password):
