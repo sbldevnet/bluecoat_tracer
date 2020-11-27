@@ -825,7 +825,7 @@ def get_xml_dst_object_match(root, destination):
 
     # categorylist4
     for category in root.findall('conditionObjects/categorylist4'):
-        category_name = category.attrib.get('name')        
+        category_name = category.attrib.get('name')
         for cat_i in category.findall('sel/i'):
             cat_i_name = cat_i.text.strip(' \n\t')
             if cat_i_name in match_dst_objects:
@@ -923,8 +923,10 @@ def get_xml_dst_object_match(root, destination):
 
 def get_auth_obj_match(auth_obj_name):
     """
-    Check if xml auth-obj match with selected AUTH_METHOD (group in xml)
-    Return boolean
+    Description:
+        Check if xml auth-obj match with selected AUTH_METHOD (group in xml).
+    Output:
+        Boolean.
     """
     logging.debug("Exec: get_auth_obj_match(%s)", auth_obj_name)
 
@@ -942,8 +944,10 @@ def get_auth_obj_match(auth_obj_name):
 
 def get_adm_auth_obj_match(auth_obj_name):
     """
-    Check if xml adm-auth-obj match with selected AUTH_METHOD (group in xml)
-    Return boolean
+    Description:
+        Check if xml adm-auth-obj match with selected AUTH_METHOD (group in xml).
+    Output:
+        Boolean.
     """
 
     logging.debug("Exec: get_adm_auth_obj_match()")
@@ -966,9 +970,9 @@ def get_xml_policy_layers(root):
     Description:
         Get all layers enabled and not exclued in var exclude_layers.
     Input:
-        root            - (XML Element) XML root
+        root            - (XML Element) XML root.
     Output:
-        layers_enabled  - (XML Element List) Policy layers enabled
+        layers_enabled  - (XML Element List) Policy layers enabled.
     """
     logging.debug("Exec: get_xml_policy_layers()")
 
@@ -1030,7 +1034,7 @@ def get_rows_src_match(layer, match_src_objects, match_comb_obj):
         match_src_objects   - (str List)    XML objects Name that matches with input.
         match_comb_obj      - (str List)    XML comb-obj Name that matches with match_src_objects.
     Output:
-        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
+        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
     """
     logging.debug("Exec: get_rows_src_match()")
 
@@ -1065,10 +1069,10 @@ def get_rows_dst_match(match_array_src, match_dst_objects):
     Description:
         Check if dst match in layers.
     Input:
-        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
+        match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
         match_src_objects   - (str List)    XML objects Name that matches with input.
     Output:
-        match_array_dst     - ([] List)     [layer (XML Element), row (XML Element), action (bool)]
+        match_array_dst     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
     """
     logging.debug("Exec: get_rows_dst_match()")
 
@@ -1098,9 +1102,9 @@ def get_rows_dst_match(match_array_src, match_dst_objects):
 def print_layer_row(match_array):
     """
     Description:
-        Print match layers in table format
+        Print match layers in table format.
     Input:
-        match_array - (List) [layer, row, action]
+        match_array - (List) [layer, row, action].
     """
     logging.debug("Exec print_layer_row()")
 
