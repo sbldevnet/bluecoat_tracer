@@ -43,6 +43,7 @@ colormap = {
     "blue": "\033[1;36m",
     "reset": "\033[0m"
 }
+
 def red(text):
     """
     Description:
@@ -787,13 +788,12 @@ def get_xml_com_obj_match(root, match_src_objects):
 
     return comb_obj_match
 
-
 def get_xml_dst_object_match(root, destination):
     """
     Description:
         Search match in destination objects (ipobject, a-url, categorylist4).
     Input:
-        root        - (XML Element) XML root.
+        root              - (XML Element) XML root.
 
     Output:
         match_dst_objects - (str List) Name of XML objects that matches.
@@ -825,17 +825,17 @@ def get_xml_dst_object_match(root, destination):
 
     # categorylist4
     for category in root.findall('conditionObjects/categorylist4'):
-        category_name = category.attrib.get('name')
+        category_name = category.attrib.get('name')        
         for cat_i in category.findall('sel/i'):
-            cat_i_name = cat_i.text
+            cat_i_name = cat_i.text.strip(' \n\t')
             if cat_i_name in match_dst_objects:
                 match_dst_objects.append(category_name)
-                logging.info("Object match. Name '%s'  cat <i> '%s'", category_name, cat_i_name)
+                logging.info("Object match. Name '%s' cat <i> '%s'", category_name, cat_i_name)
         for cat_ai in category.findall('sel/ai'):
             cat_ai_name = cat_ai.attrib.get('n')
             if cat_ai_name in match_dst_objects:
                 match_dst_objects.append(category_name)
-                logging.info("Object match. Name '%s'  cat <ai> '%s'", category_name, cat_ai_name)
+                logging.info("Object match. Name '%s' cat <ai> '%s'", category_name, cat_ai_name)
 
     # a-url
     for a_url_object in root.findall("conditionObjects/a-url"):
@@ -907,12 +907,6 @@ def get_xml_dst_object_match(root, destination):
             match_dst_objects.append(a_url_object_name)
             logging.info("Object match. Name '%s'  ", a_url_object_name)
 
-        # if input_src in ipaddress.ip_network(ipobject.attrib.get('value'), False):
-        #     ipobject_name = ipobject.attrib.get('name')
-        #     ipobject_subnet = ipobject.attrib.get('value')
-        #     match_src_objects.append(ipobject_name)
-        #     logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
-
     # ipobject
     try:
         dest_ip = ipaddress.ip_address(destination.netloc)
@@ -926,7 +920,6 @@ def get_xml_dst_object_match(root, destination):
         logging.debug("Input get_xml_dst_object_match() is not ipadress:" + str(e))
 
     return match_dst_objects
-
 
 def get_auth_obj_match(auth_obj_name):
     """
@@ -946,7 +939,6 @@ def get_auth_obj_match(auth_obj_name):
         return True
     else:
         return False
-
 
 def get_adm_auth_obj_match(auth_obj_name):
     """
