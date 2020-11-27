@@ -246,7 +246,7 @@ def search_complete():
                 if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable'\
                 or layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.WebAccessPolicyTable':
                     match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj)
-                    match_array_dst = get_rows_dst_match(match_array_src, match_dst_objects)
+                    match_array_dst = get_rows_dst_match(match_array_src, match_dst_objects, match_comb_obj_dst)
                     print_layer_row(match_array_dst)
 
             yellow("INFO: Objects matched")
@@ -1064,13 +1064,14 @@ def get_rows_src_match(layer, match_src_objects, match_comb_obj):
 
     return match_array_src
 
-def get_rows_dst_match(match_array_src, match_dst_objects):
+def get_rows_dst_match(match_array_src, match_dst_objects, match_comb_obj_dst):
     """
     Description:
         Check if dst match in layers.
     Input:
         match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
-        match_src_objects   - (str List)    XML objects Name that matches with input.
+        match_dst_objects   - (str List)    XML objects Name that matches with input.
+        match_comb_obj_dst  - (str List)    XML comb_obj names that include some match_dst_objects.
     Output:
         match_array_dst     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
     """
@@ -1083,8 +1084,7 @@ def get_rows_dst_match(match_array_src, match_dst_objects):
         row    = match[1]
         action = match[2]
         row_dst = row.find('colItem[@id="de"]').attrib.get('name')
-        # print(row_dst) #DELETEME
-        if row_dst == 'Any' or row_dst in match_dst_objects:
+        if row_dst == 'Any' or row_dst in match_dst_objects or row_dst in match_comb_obj_dst:
             match_array_dst.append([layer, row, action])
         else:
             object_type = get_xml_object_type(row_dst)
