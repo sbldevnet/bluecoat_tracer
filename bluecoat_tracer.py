@@ -36,18 +36,45 @@ from vars import *
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Define Colors
-class Bcolors:
-    """Output colors"""
-    BLUE    = '\033[1;36m'
-    GREEN   = '\033[92m'
-    YELLOW  = '\033[93m'
-    RED     = '\033[91m'
-    RESET   = '\033[0m'
-    BOLD    = '\033[1m'
+colormap = {
+    "red": "\033[91m",
+    "yellow": "\033[93m",
+    "green": "\033[92m",
+    "blue": "\033[1;36m",
+    "reset": "\033[0m"
+}
+def red(text):
+    """
+    Description:
+        Return text in red color.
+    """
+    return colormap["red"] + text + colormap["reset"]
+
+def yellow(text):
+    """
+    Description:
+        Return text in yellow color.
+    """
+    return colormap["yellow"] + text + colormap["reset"]
+
+def green(text):
+    """
+    Description:
+        Return text in green color.
+    """
+    return colormap["green"] + text + colormap["reset"]
+
+def blue(text):
+    """
+    Description:
+        Return text in blue color.
+    """
+    return colormap["blue"] + text + colormap["reset"]
+
 
 # Check python version
 if sys.version_info[0] < 3:
-    sys.exit(f"{Bcolors.RED}Upgrade Python Version{Bcolors.RESET}")
+    sys.exit(red("Upgrade Python Version"))
 
 # Set Log
 if sys.version_info[1] < 9:
@@ -60,12 +87,12 @@ else:
 
 # Init Banner
 print()
-print(f"{Bcolors.BLUE}")
-print("#####################################")
-print("##  Symantec ProxySG Utility Tool  ##")
-print("#####################################")
-print(f"{Bcolors.GREEN}", end="")
-print("https://github.com/sburgosl")
+print()
+print(blue("#####################################"))
+print(blue("##  Symantec ProxySG Utility Tool  ##"))
+print(blue("#####################################"))
+print()
+print(green("https://github.com/sburgosl"))
 print()
 
 
@@ -82,15 +109,15 @@ def main():
     logging.debug("Exec: main()")
 
     print()
-    print(f"{Bcolors.BLUE}[GLOBAL VARIABLES]{Bcolors.RESET}")
+    print(blue("[GLOBAL VARIABLES]"))
     print("Auth method: " + AUTH_METHOD)
     print("Proxy Port: " + str(PROXY_PORT))
     print("Exclude layers: " + str(EXCLUDE_LAYERS))
     print()
-    print(f"{Bcolors.BLUE}[OPTIONS]{Bcolors.RESET}")
+    print(blue("[OPTIONS]"))
     print("[1]: Search source IP match")
-    print(f"[2]: {Bcolors.RED}[WIP]{Bcolors.RESET}Search destination (IP/FQDN/URL)")
-    print(f"[3]: {Bcolors.YELLOW}[Testing]{Bcolors.RESET}Search source/destination")
+    print("[2]: " + red("[WIP]") + "Search destination (IP/FQDN/URL)")
+    print("[3]: " + yellow("[Testing]") + "Search source/destination")
     print("[4]: Get / Select authentication")
     print("[5]: Select proxy port")
     print("[6]: Download policy xml")
@@ -111,12 +138,10 @@ def main():
         switcher.get(option, main)()
 
     except ValueError as error:
-        msg_wrn("Not valid input")
+        yellow("Not valid input")
         logging.warning("Not int on main() input: %s",error)
-
     except KeyboardInterrupt:
         sys.exit("")
-
     except Exception as error:
         logging.critical(error)
         sys.exit('Error')
@@ -155,14 +180,14 @@ def menu_search_source_ip():
                 match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj)
                 print_layer_row(match_array_src)
 
-        msg_wrn("INFO: Objects matched")
+        yellow("INFO: Objects matched")
         print(match_src_objects)
         print(match_comb_obj)
         print_end()
 
     except ValueError as error:
         logging.warning("Input menu_search_source_ip() is not ipadress: %s",error)
-        msg_wrn("Input not valid")
+        yellow("Input not valid")
         menu_search_source_ip()
 
 
@@ -184,9 +209,9 @@ def search_complete():
     logging.debug("Exec: search_complete()")
 
     if not ONLINE:
-        msg_wrn("Warning: Function limited with var ONLINE = False")
-        msg_wrn("Not check Blue Coat Categories")
-        msg_sys("Offile mode Currently Work In Progress")
+        yellow("Warning: Function limited with var ONLINE = False")
+        yellow("Not check Blue Coat Categories")
+        sys.exit(red("Offile mode Currently Work In Progress"))
 
     root = get_xml_root()
     try:
@@ -197,7 +222,7 @@ def search_complete():
         input_dest = urlparse(input())
 
         if input_dest.netloc == '':
-            msg_wrn('[Error]: Destination is not in URL format')
+            yellow('[Error]: Destination is not in URL format')
             logging.warning("Input destination search_complete() is not URL: %s",input_dest)
 
         else:
@@ -223,11 +248,11 @@ def search_complete():
                     match_array_dst = get_rows_dst_match(match_array_src, match_dst_objects)
                     print_layer_row(match_array_dst)
 
-            msg_wrn("INFO: Objects matched")
-            msg_wrn("Src:")
+            yellow("INFO: Objects matched")
+            yellow("Src:")
             print(match_src_objects)
             print(match_comb_obj)
-            msg_wrn("Dst:")
+            yellow("Dst:")
             print(match_dst_objects)
             print(match_comb_obj_dst)
 
@@ -310,7 +335,7 @@ def menu_download_policy():
     logging.debug("Exec: menu_download_policy()")
 
     if not ONLINE:
-        msg_wrn("WARNING: Option not available with var ONLINE = False")
+        yellow("WARNING: Option not available with var ONLINE = False")
     else:
         # Ask User & Pass
         print("Enter User (Management Center): ", end="")
@@ -355,7 +380,7 @@ def menu_download_policy():
             if not policy_download == "retry":
                 loop = False
 
-        print(f"{Bcolors.GREEN}[OK]{Bcolors.RESET}")
+        print(green("[OK]"))
 
 def get_proxy_policies(user, password):
     """
@@ -377,11 +402,11 @@ def get_proxy_policies(user, password):
         if req.status_code == 200:
             return req.json()
         if req.status_code == 401:
-            msg_wrn("HTTP 401: Unauthorized")
+            yellow("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            msg_wrn("HTTP 403: Forbidden")
+            yellow("HTTP 403: Forbidden")
         elif req.status_code == 404:
-            msg_wrn("HTTP 404: Not Found")
+            yellow("HTTP 404: Not Found")
         else:
             logging.error("Status Code not handled in get_proxy_policies()")
 
@@ -392,7 +417,7 @@ def get_proxy_policies(user, password):
     except Exception as error:
         logging.error("Error not handled in get_proxy_policies(): %s", error)
 
-    msg_wrn("Connection Error: see logs for more info")
+    yellow("Connection Error: see logs for more info")
     return "error"
 
 def get_proxy_policy_versions(user, password, policy_uuid):
@@ -416,11 +441,11 @@ def get_proxy_policy_versions(user, password, policy_uuid):
         if req.status_code == 200:
             return req.json()
         if req.status_code == 401:
-            msg_wrn("HTTP 401: Unauthorized")
+            yellow("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            msg_wrn("HTTP 403: Forbidden")
+            yellow("HTTP 403: Forbidden")
         elif req.status_code == 404:
-            msg_wrn("HTTP 404: Not Found")
+            yellow("HTTP 404: Not Found")
             return "retry"
         else:
             logging.error("Status Code not handled in get_proxy_policy_versions()")
@@ -432,7 +457,7 @@ def get_proxy_policy_versions(user, password, policy_uuid):
     except Exception as error:
         logging.error("Error not handled in get_proxy_policy_versions(): %s", error)
 
-    msg_wrn("Connection Error: see logs for more info")
+    yellow("Connection Error: see logs for more info")
     return "error"
 
 def get_proxy_policy_download(user, password, policy_uuid, revision):
@@ -463,11 +488,11 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
             return
 
         if req.status_code == 401:
-            msg_wrn("HTTP 401: Unauthorized")
+            yellow("HTTP 401: Unauthorized")
         elif req.status_code == 403:
-            msg_wrn("HTTP 403: Forbidden")
+            yellow("HTTP 403: Forbidden")
         elif req.status_code == 404:
-            msg_wrn("HTTP 404: Not Found")
+            yellow("HTTP 404: Not Found")
             return "retry"
         else:
             logging.error("Status Code not handled in get_proxy_policy_download()")
@@ -479,7 +504,7 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
     except Exception as error:
         logging.error("Error not handled in get_proxy_policy_versions(): %s", error)
 
-    msg_wrn("Connection Error: see logs for more info")
+    yellow("Connection Error: see logs for more info")
     return "error"
 
 
@@ -487,7 +512,6 @@ def get_proxy_policy_download(user, password, policy_uuid, revision):
 # Proxy Node Methods
 ##############################
 
-# OK
 def get_online_categories(destination):
     """
     Description:
@@ -518,7 +542,6 @@ def get_online_categories(destination):
         categories = [policy, bluecoat]
         return categories
 
-# OK
 def get_proxy_categories(user, password, destination):
     """
     Description:
@@ -541,34 +564,27 @@ def get_proxy_categories(user, password, destination):
         if req.status_code == 200:
             rtext = req.text.strip().split('\n')
             return rtext
-
-        elif req.status_code == 401:
-            sys.exit(f"{Bcolors.RED}Authentication Error{Bcolors.RESET}")
-
+        if req.status_code == 401:
+            sys.exit(red("Authentication Error"))
         elif req.status_code == 403:
-            sys.exit(f"{Bcolors.RED}Forbidden{Bcolors.RESET}")
-
+            sys.exit(red("Forbidden"))
         else:
             logging.error("Status Code not handled in get_proxy_categories()")
-            sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
 
     except ValueError as e:
         logging.error("Error in response in get_proxy_categories()" + str(e))
-
     except requests.exceptions.ConnectionError as e:
         logging.error("Connection error in get_proxy_categories(): " + str(e))
-
     except Exception as e:
         logging.error("Error not handled in get_proxy_categories(): " + str(e))
 
-    sys.exit(f"{Bcolors.RED}Connection Error{Bcolors.RESET}: see logs for more info")
+    sys.exit(red("Connection Error: see logs for more info"))
 
 
 ##############################
 # XML Methods
 ##############################
 
-# OK
 def get_xml_root():
     """
     Description:
@@ -583,7 +599,7 @@ def get_xml_root():
 
     except OSError as e:
         logging.error("No such file in get_xml_root() " + str(e))
-        sys.exit(f"{Bcolors.RED}No such xml file{Bcolors.RESET}: Edit variable FILE_PATH in vars.py file or download with option [6]")
+        sys.exit(red("No such xml file: Edit variable FILE_PATH in vars.py file or download it with option [6]"))
 
 
 def get_xml_object_type(object_search):
@@ -600,7 +616,6 @@ def get_xml_object_type(object_search):
 
     return object_type
 
-# OK
 def get_xml_src_object_match(root, input_src):
     """
     Description:
@@ -642,7 +657,6 @@ def get_xml_src_object_match(root, input_src):
 
     return match_src_objects
 
-# OK
 def get_xml_com_obj_match(root, match_src_objects):
     """
     Description:
@@ -955,7 +969,6 @@ def get_adm_auth_obj_match(auth_obj_name):
     else:
         return False
 
-# OK
 def get_xml_policy_layers(root):
     """
     Description:
@@ -978,7 +991,6 @@ def get_xml_policy_layers(root):
 
     return layers_enabled
 
-# OK
 def evaluate_action(row):
     """
     Description:
@@ -1014,10 +1026,9 @@ def evaluate_action(row):
     if dst_object_type == 'effective-threat-risk-lvl':
         return None
     else:
-        msg_wrn("Warning: Action not evaluated. See logs for more information")
+        yellow("Warning: Action not evaluated. See logs for more information")
         logging.warning("Object type '%s' not parsing in evaluate_action()", dst_object_type)
 
-# OK
 def get_rows_src_match(layer, match_src_objects, match_comb_obj):
     """
     Description:
@@ -1052,12 +1063,11 @@ def get_rows_src_match(layer, match_src_objects, match_comb_obj):
                 object_type = get_xml_object_type(row_src)
                 if not object_type == 'comb-obj' and not object_type == 'proxy'\
                     and not object_type == 'group' and not object_type == 'ipobject':
-                    msg_wrn("Warning: Object not evaluated. See logs for more information")
+                    yellow("Warning: Object not evaluated. See logs for more information")
                     logging.warning("Object type '%s' not parsing in get_rows_src_match(%s)", object_type, row_src)
 
     return match_array_src
 
-# OK
 def get_rows_dst_match(match_array_src, match_dst_objects):
     """
     Description:
@@ -1088,12 +1098,11 @@ def get_rows_dst_match(match_array_src, match_dst_objects):
             elif not object_type == 'node' and not object_type == 'a-url'\
             and not object_type == 'categorylist4'and not object_type == 'ipobject'\
             and not object_type == 'comb-obj':
-                msg_wrn("Warning: Object not evaluated. See logs for more information")
+                yellow("Warning: Object not evaluated. See logs for more information")
                 logging.warning("Object type '%s' not parsing in get_rows_dst_match(%s)", object_type, row_dst)
 
     return match_array_dst
 
-# OK
 def print_layer_row(match_array):
     """
     Description:
@@ -1105,9 +1114,9 @@ def print_layer_row(match_array):
 
     # Define static print values
     headers         = ["", "Layer", "Row", "Src", "Dst", "Action", "Description"]
-    action_allow    = f"{Bcolors.GREEN}✓{Bcolors.RESET}"
-    action_deny     = f"{Bcolors.RED}X{Bcolors.RESET}"
-    action_unknown  = f"{Bcolors.YELLOW}?{Bcolors.RESET}"
+    action_allow    = green("✓")
+    action_deny     = red("X")
+    action_unknown  = yellow("?")
 
     # Init print array
     print_array = []
@@ -1139,43 +1148,39 @@ def print_layer_row(match_array):
 ##############################
 # Global Methods
 ##############################
-# OK
+
 def print_start():
     """
     Description:
-        Print start banner for display matched rules
+        Print start banner for display matched rules.
     """
-    print(f"{Bcolors.BLUE}\n-----------------------[START]-----------------------{Bcolors.RESET}")
+    print(blue("\n-----------------------[START]-----------------------"))
 
-# OK
 def print_end():
     """
     Description:
-        Print end banner for display matched rules
+        Print end banner for display matched rules.
     """
-    print(f"{Bcolors.BLUE}\n------------------------[END]------------------------\n{Bcolors.RESET}")
+    print(blue("\n------------------------[END]------------------------\n"))
 
-# OK
 def msg_sys(message):
     """
     Description:
-        Exec sys.exit() with specific message and RED color
+        Exec sys.exit() with specific message and RED color.
     Input:
-        message - (String) message to output
+        message - (String) message to output.
     """
-    sys.exit(f"{Bcolors.RED}" + message + f"{Bcolors.RESET}")
+    sys.exit(red(message))
 
-# OK
 def msg_wrn(message):
     """
     Description:
-        Print message with specific message in YELLOW color
+        Print message with specific message in YELLOW color.
     Input:
-        message - (String) message to output
+        message - (String) message to output.
     """
-    print(f"{Bcolors.YELLOW}" + message + f"{Bcolors.RESET}")
+    print(yellow(message))
 
-# OK
 if __name__ == "__main__":
     """"""
     main()
