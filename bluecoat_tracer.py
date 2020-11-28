@@ -787,6 +787,14 @@ def get_xml_dst_object_match(root, destination):
     except ValueError as error:
         logging.debug("Input get_xml_dst_object_match() is not ipadress: %s", error)
 
+    # Bypass objects threat-risk & svr-cert
+    for xml_object in root.findall("conditionObjects/threat-risk"):
+        xml_object_name = xml_object.attrib.get('name')
+        match_dst_objects.append(xml_object_name)
+    for xml_object in root.findall("conditionObjects/svr-cert"):
+        xml_object_name = xml_object.attrib.get('name')
+        match_dst_objects.append(xml_object_name)
+
     return match_dst_objects
 
 def get_xml_com_obj_match(root, match_objects):
