@@ -1,5 +1,4 @@
 # Symantec Advanced Security Gateway Tracert Tool (Blue Coat Proxy)
-# `WORK IN PROGRESS`
 
 ## Table of contents
 - [Description](#description)
@@ -45,7 +44,7 @@ Exclude layers: ['Layer_Test']
 
 [OPTIONS]
 [1]: Search source IP match
-[2]: Search destination (IP/FQDN/URL)
+[2]: [WIP] Search destination (IP/FQDN/URL)
 [3]: Search source/destination
 [4]: Get / Select authentication
 [5]: Select proxy port
@@ -57,7 +56,7 @@ Select Option:
 
 ## Requirements
 
-#### Offline mode
+#### Offline mode [WIP]
 `vars.py`
 ```python3
 ONLINE = False
