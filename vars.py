@@ -10,13 +10,13 @@ Description:
 #####################
 # (String) API URL
 API_URL     = 'https://example:8082/api/' # Management System
-NODE_URL    = 'https://example:8082/' # Admistration proxy 
+NODE_URL    = 'https://example:8082/' # Admistration proxy
 
 #####################
 # Policy Variables
 #####################
 # (Int) Proxy explicit port for policy trace
-proxy_port = 8080
+PROXY_PORT = 8080
 
 #(str) Authentication method, group-base in xml
 AUTH_METHOD = ''
