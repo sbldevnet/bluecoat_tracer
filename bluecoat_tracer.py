@@ -233,7 +233,7 @@ def search_complete():
             match_src_objects = get_xml_src_object_match(root, input_src)
 
             # Get comb-obj that contains match_ipbojects. This improves efficency
-            match_comb_obj = get_xml_com_obj_match(root, match_src_objects)
+            match_comb_obj_src = get_xml_com_obj_match(root, match_src_objects)
 
             # Get all objects that matches with destination
             match_dst_objects = get_xml_dst_object_match(root, input_dest)
@@ -245,14 +245,14 @@ def search_complete():
             for layer in layers_enabled:
                 if layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.UserAuthenticationPolicyTable'\
                 or layer.attrib.get('layertype') == 'com.bluecoat.sgos.vpm.WebAccessPolicyTable':
-                    match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj)
+                    match_array_src = get_rows_src_match(layer, match_src_objects, match_comb_obj_src)
                     match_array_dst = get_rows_dst_match(match_array_src, match_dst_objects, match_comb_obj_dst)
                     print_layer_row(match_array_dst)
 
             yellow("INFO: Objects matched")
             yellow("Src:")
             print(match_src_objects)
-            print(match_comb_obj)
+            print(match_comb_obj_src)
             yellow("Dst:")
             print(match_dst_objects)
             print(match_comb_obj_dst)
@@ -657,136 +657,6 @@ def get_xml_src_object_match(root, input_src):
 
     return match_src_objects
 
-def get_xml_com_obj_match(root, match_src_objects):
-    """
-    Description:
-        Search comb-obj that contains match_src_objects.
-    Input:
-        root                - (XML Element) XML root,
-        match_src_objects   - (str List) XML ipobjects/h-o names that include input_src IP.
-    Output:
-        match_comb_obj      - (str List) XML comb_obj names that include some match_src_objects.
-    """
-    logging.debug("Exec: get_xml_com_obj_match()")
-
-    comb_obj_match    = []
-    # comb_obj_no_match = []
-    comb_objs = root.findall('conditionObjects/comb-obj')
-    for comb_obj in comb_objs:
-        comb_obj_name = comb_obj.attrib.get('name')
-        comb_obj_cl1  = comb_obj.attrib.get('n-1') # 'false' = select, 'true' = negate
-        comb_obj_cl2  = comb_obj.attrib.get('n-2') # 'false' = select, 'true' = negate
-        cl1_list      = comb_obj.findall('c-l-1')
-        cl2_list      = comb_obj.findall('c-l-2')
-
-        # cl1 false and cl2 false
-        if comb_obj_cl1 == 'false' and comb_obj_cl2 == 'false':
-            cl1_match = False
-            cl2_match = False
-            for cl1 in cl1_list:
-                cl1_name = cl1.attrib.get('n')
-                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
-                    cl1_match = True
-                    break
-            if cl1_match:
-                if cl2_list == []:
-                    comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 empty
-                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
-                        comb_obj_name, cl1_name)
-                else:
-                    for cl2 in cl2_list:
-                        cl2_name = cl2.attrib.get('n')
-                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
-                            cl2_match = True
-                            comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 ok
-                            logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
-                                comb_obj_name, cl1_name, cl2_name)
-                            break
-            # if not cl1_match or not cl2_match:
-            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
-
-        # cl1 false and cl2 true
-        elif comb_obj_cl1 == 'false' and comb_obj_cl2 == 'true':
-            cl1_match = False
-            cl2_match = False
-            for cl1 in cl1_list:
-                cl1_name = cl1.attrib.get('n')
-                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
-                    cl1_match = True
-                    break
-            if cl1_match:
-                if cl2_list == []:
-                    comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 empty
-                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
-                        comb_obj_name, cl1_name)
-                else:
-                    for cl2 in cl2_list:
-                        cl2_name = cl2.attrib.get('n')
-                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
-                            cl2_match = True
-                            # comb_obj_no_match.append(comb_obj_name) # cl1 ok, !cl2 ok
-                            break
-                    if not cl2_match:
-                        comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 ko
-                        logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
-                            comb_obj_name, cl1_name, cl2_name)
-            # if not cl1_match:
-            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
-
-        # cl1 true and cl2 false
-        elif comb_obj_cl1 == 'true' and comb_obj_cl2 == 'false':
-            cl1_match = False
-            cl2_match = False
-            for cl1 in cl1_list:
-                cl1_name = cl1.attrib.get('n')
-                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
-                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
-                    cl1_match = True
-                    break
-            if not cl1_match:
-                if cl2_list == []:
-                    comb_obj_match.append(comb_obj_name) # !cl1 ko && cl2 empty
-                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
-                else:
-                    for cl2 in cl2_list:
-                        cl2_name = cl2.attrib.get('n')
-                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
-                            cl2_match = True
-                            comb_obj_match.append(comb_obj_name) # !cl1 ko, cl2 ok
-                            logging.info("Comb-obj match. Name '%s'  Negate cl1, cl2 '%s'",\
-                                comb_obj_name, cl2_name)
-                            break
-                    # if not cl2_match:
-                    #     comb_obj_no_match.append(comb_obj_name) # !cl1 ko && cl2 ko
-
-        # cl1 true and cl2 true
-        else:
-            cl1_match = False
-            cl2_match = False
-            for cl1 in cl1_list:
-                cl1_name = cl1.attrib.get('n')
-                if cl1_name in match_src_objects or cl1_name in comb_obj_match:
-                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
-                    cl1_match = True
-                    break
-            if not cl1_match:
-                if cl2_list == []:
-                    comb_obj_match.append(comb_obj_name) # !cl1 ko && !cl2 empty
-                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
-                else:
-                    for cl2 in cl2_list:
-                        cl2_name = cl2.attrib.get('n')
-                        if cl2_name in match_src_objects or cl2_name in comb_obj_match:
-                            cl2_match = True
-                            # comb_obj_no_match.append(comb_obj_name) # !cl1 ko, !cl2 ok
-                            break
-                    if not cl2_match:
-                        comb_obj_match.append(comb_obj_name) # !cl1 ko, !cl2 ko
-                        logging.info("Comb-obj match. Name '%s'  Negate cl1 '%s' & cl2 '%s'",\
-                                comb_obj_name, cl1_name, cl2_name)
-
-    return comb_obj_match
-
 def get_xml_dst_object_match(root, destination):
     """
     Description:
@@ -918,6 +788,136 @@ def get_xml_dst_object_match(root, destination):
         logging.debug("Input get_xml_dst_object_match() is not ipadress: %s", error)
 
     return match_dst_objects
+
+def get_xml_com_obj_match(root, match_objects):
+    """
+    Description:
+        Search comb-obj that contains match_objects.
+    Input:
+        root                - (XML Element) XML root,
+        match_objects       - (str List) XML ipobjects/h-o names that include input_src IP.
+    Output:
+        match_comb_obj      - (str List) XML comb_obj names that include some match_objects.
+    """
+    logging.debug("Exec: get_xml_com_obj_match()")
+
+    comb_obj_match    = []
+    # comb_obj_no_match = []
+    comb_objs = root.findall('conditionObjects/comb-obj')
+    for comb_obj in comb_objs:
+        comb_obj_name = comb_obj.attrib.get('name')
+        comb_obj_cl1  = comb_obj.attrib.get('n-1') # 'false' = select, 'true' = negate
+        comb_obj_cl2  = comb_obj.attrib.get('n-2') # 'false' = select, 'true' = negate
+        cl1_list      = comb_obj.findall('c-l-1')
+        cl2_list      = comb_obj.findall('c-l-2')
+
+        # cl1 false and cl2 false
+        if comb_obj_cl1 == 'false' and comb_obj_cl2 == 'false':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_objects or cl1_name in comb_obj_match:
+                    cl1_match = True
+                    break
+            if cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
+                        comb_obj_name, cl1_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            comb_obj_match.append(comb_obj_name) # cl1 ok, cl2 ok
+                            logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
+                                comb_obj_name, cl1_name, cl2_name)
+                            break
+            # if not cl1_match or not cl2_match:
+            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
+
+        # cl1 false and cl2 true
+        elif comb_obj_cl1 == 'false' and comb_obj_cl2 == 'true':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_objects or cl1_name in comb_obj_match:
+                    cl1_match = True
+                    break
+            if cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Contains '%s'",\
+                        comb_obj_name, cl1_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            # comb_obj_no_match.append(comb_obj_name) # cl1 ok, !cl2 ok
+                            break
+                    if not cl2_match:
+                        comb_obj_match.append(comb_obj_name) # cl1 ok, !cl2 ko
+                        logging.info("Comb-obj match. Name '%s'  Contains '%s' & '%s'",\
+                            comb_obj_name, cl1_name, cl2_name)
+            # if not cl1_match:
+            #     comb_obj_no_match.append(comb_obj_name) # cl1 ko
+
+        # cl1 true and cl2 false
+        elif comb_obj_cl1 == 'true' and comb_obj_cl2 == 'false':
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_objects or cl1_name in comb_obj_match:
+                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
+                    cl1_match = True
+                    break
+            if not cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # !cl1 ko && cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            comb_obj_match.append(comb_obj_name) # !cl1 ko, cl2 ok
+                            logging.info("Comb-obj match. Name '%s'  Negate cl1, cl2 '%s'",\
+                                comb_obj_name, cl2_name)
+                            break
+                    # if not cl2_match:
+                    #     comb_obj_no_match.append(comb_obj_name) # !cl1 ko && cl2 ko
+
+        # cl1 true and cl2 true
+        else:
+            cl1_match = False
+            cl2_match = False
+            for cl1 in cl1_list:
+                cl1_name = cl1.attrib.get('n')
+                if cl1_name in match_objects or cl1_name in comb_obj_match:
+                    # comb_obj_no_match.append(comb_obj_name) # !cl1 ok
+                    cl1_match = True
+                    break
+            if not cl1_match:
+                if cl2_list == []:
+                    comb_obj_match.append(comb_obj_name) # !cl1 ko && !cl2 empty
+                    logging.info("Comb-obj match. Name '%s'  Negate source ", comb_obj_name)
+                else:
+                    for cl2 in cl2_list:
+                        cl2_name = cl2.attrib.get('n')
+                        if cl2_name in match_objects or cl2_name in comb_obj_match:
+                            cl2_match = True
+                            # comb_obj_no_match.append(comb_obj_name) # !cl1 ko, !cl2 ok
+                            break
+                    if not cl2_match:
+                        comb_obj_match.append(comb_obj_name) # !cl1 ko, !cl2 ko
+                        logging.info("Comb-obj match. Name '%s'  Negate cl1 '%s' & cl2 '%s'",\
+                                comb_obj_name, cl1_name, cl2_name)
+
+    return comb_obj_match
 
 def get_auth_obj_match(auth_obj_name):
     """
