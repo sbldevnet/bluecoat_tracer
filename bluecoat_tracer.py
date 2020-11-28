@@ -77,6 +77,7 @@ def blue(text):
 if sys.version_info[0] < 3:
     sys.exit(red("Upgrade Python Version"))
 
+
 # Set Log
 if sys.version_info[1] < 9:
     logging.basicConfig(filename=LOG_FILE_NAME, level=logging.DEBUG, \
@@ -92,7 +93,6 @@ print()
 print(blue("#####################################"))
 print(blue("##  Symantec ProxySG Utility Tool  ##"))
 print(blue("#####################################"))
-print()
 print(green("https://github.com/sburgosl"))
 print()
 
@@ -344,7 +344,7 @@ def menu_download_policy():
         print("Enter Pass: ", end="")
         password = getpass()
         print()
-        
+
         # Get policies
         loop = True
         while loop:
@@ -352,7 +352,7 @@ def menu_download_policy():
             if policies == "error":
                 return
             loop = False
-        
+
         # Print policies and Ask uuid
         loop = True
         while loop:
@@ -375,7 +375,7 @@ def menu_download_policy():
                 print("Version: '" + version['revisionNumber'] + "' Date: '" + version['revisionDate'] + "' : '" + version['revisionDescription'] + "'")
             print("Enter Version: ", end="")
             revision = input()
-            
+
             # Get policy
             policy_download = get_proxy_policy_download(user, password, policy_uuid, revision)
             if not policy_download == "retry":
@@ -572,12 +572,12 @@ def get_proxy_categories(user, password, destination):
         else:
             logging.error("Status Code not handled in get_proxy_categories()")
 
-    except ValueError as e:
-        logging.error("Error in response in get_proxy_categories()" + str(e))
-    except requests.exceptions.ConnectionError as e:
-        logging.error("Connection error in get_proxy_categories(): " + str(e))
-    except Exception as e:
-        logging.error("Error not handled in get_proxy_categories(): " + str(e))
+    except ValueError as error:
+        logging.error("Error in response in get_proxy_categories(): %s", error)
+    except requests.exceptions.ConnectionError as error:
+        logging.error("Connection error in get_proxy_categories(): %s", error)
+    except Exception as error:
+        logging.error("Error not handled in get_proxy_categories(): %s", error)
 
     sys.exit(red("Connection Error: see logs for more info"))
 
@@ -589,19 +589,18 @@ def get_proxy_categories(user, password, destination):
 def get_xml_root():
     """
     Description:
-        Get xml tree root
+        Get xml tree root.
     Output:
-        policy_xml_root - (XML Element) XML root
+        policy_xml_root - (XML Element) XML root.
     """
     try:
         policy_xml = ET.parse(FILE_PATH)
         policy_xml_root = policy_xml.getroot()
         return policy_xml_root
 
-    except OSError as e:
-        logging.error("No such file in get_xml_root() " + str(e))
+    except OSError as error:
+        logging.error("No such file in get_xml_root(): %s", error)
         sys.exit(red("No such xml file: Edit variable FILE_PATH in vars.py file or download it with option [6]"))
-
 
 def get_xml_object_type(object_search):
     """
@@ -844,7 +843,7 @@ def get_xml_dst_object_match(root, destination):
         xml_p = a_url_object.attrib.get('p')
         xml_d = a_url_object.attrib.get('d')
 
-        if not xml_h == None:
+        if not xml_h is None:
             xml_h_t = a_url_object.attrib.get('h-t')
             if xml_h_t == 'exact-phrase':
                 if not destination.hostname == xml_h:
@@ -864,48 +863,47 @@ def get_xml_dst_object_match(root, destination):
             else:
                 logging.warning("a-url '%s' host condition (h-t in xml) not implemented in get_a_url_match()",xml_h_t)
 
-        if not xml_p == None:
+        if not xml_p is None:
             xml_p_t = a_url_object.attrib.get('p-t')
             if xml_p_t == 'exact-phrase':
                 if destination.path == xml_p:
                     match_dst_objects.append(a_url_object_name)
                     logging.info("Object match. Name '%s'  ", a_url_object_name)
                 continue
-            elif xml_p_t == 'at-end':
+            if xml_p_t == 'at-end':
                 if destination.path.endswith(xml_p):
                     match_dst_objects.append(a_url_object_name)
                     logging.info("Object match. Name '%s'  ", a_url_object_name)
                 continue
-            elif xml_p_t == 'at-beginning':
+            if xml_p_t == 'at-beginning':
                 if destination.path.startswith(xml_p):
                     match_dst_objects.append(a_url_object_name)
                     logging.info("Object match. Name '%s'  ", a_url_object_name)
                 continue
-            elif xml_p_t == 'regex':
+            if xml_p_t == 'regex':
                 if bool(re.match(xml_p, destination.path)):
                     match_dst_objects.append(a_url_object_name)
                     logging.info("Object match. Name '%s'  ", a_url_object_name)
                 continue
-            elif xml_p_t== 'contains':
+            if xml_p_t== 'contains':
                 if xml_p in destination.path:
                     match_dst_objects.append(a_url_object_name)
                     logging.info("Object match. Name '%s'  ", a_url_object_name)
                 continue
-            else:
-                logging.warning("a-url '%s' path condition (p-t in xml) not implemented in get_xml_dst_object_match()",xml_p_t)
-                continue
+
+            logging.warning("a-url '%s' path condition (p-t in xml) not implemented in get_xml_dst_object_match()",xml_p_t)
+            continue
 
         # Simple match
-        if not xml_d == None:
+        if not xml_d is None:
             if xml_d in destination.hostname:
                 match_dst_objects.append(a_url_object_name)
                 logging.info("Object match. Name '%s'  ", a_url_object_name)
             continue
 
         # Advanced match without xml_p
-        else:
-            match_dst_objects.append(a_url_object_name)
-            logging.info("Object match. Name '%s'  ", a_url_object_name)
+        match_dst_objects.append(a_url_object_name)
+        logging.info("Object match. Name '%s'  ", a_url_object_name)
 
     # ipobject
     try:
@@ -916,8 +914,8 @@ def get_xml_dst_object_match(root, destination):
                 ipobject_subnet = ipobject.attrib.get('value')
                 match_dst_objects.append(ipobject_name)
                 logging.info("Object match. Name '%s'  Subnet '%s'", ipobject_name, ipobject_subnet)
-    except ValueError as e:
-        logging.debug("Input get_xml_dst_object_match() is not ipadress:" + str(e))
+    except ValueError as error:
+        logging.debug("Input get_xml_dst_object_match() is not ipadress: %s", error)
 
     return match_dst_objects
 
@@ -937,10 +935,7 @@ def get_auth_obj_match(auth_obj_name):
         return False
 
     realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
-    if realm_search == realm_select:
-        return True
-    else:
-        return False
+    return bool(realm_search == realm_select)
 
 def get_adm_auth_obj_match(auth_obj_name):
     """
@@ -949,7 +944,6 @@ def get_adm_auth_obj_match(auth_obj_name):
     Output:
         Boolean.
     """
-
     logging.debug("Exec: get_adm_auth_obj_match()")
 
     root = get_xml_root()
@@ -957,13 +951,9 @@ def get_adm_auth_obj_match(auth_obj_name):
 
     if AUTH_METHOD == '':
         return False
-    else:
-        realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
+    realm_select = root.find("conditionObjects/group[@group-base='" + AUTH_METHOD + "']").attrib.get('realm-name')
 
-    if realm_search == realm_select:
-        return True
-    else:
-        return False
+    return bool(realm_search == realm_select)
 
 def get_xml_policy_layers(root):
     """
@@ -994,36 +984,31 @@ def evaluate_action(row):
     Input:
         row - (XML Element) row with match.
     Output:
-        Boolean / None
+        Boolean / None.
     """
     col_ac = row.find('colItem[@id="ac"]').attrib.get('name')
 
     # Evaluate action
-    allow_actions   = ["Do Not Authenticate", "Allow"]
-    deny_action     = ["Force Deny (Content Filter)", "Force Deny"]
+    actions_allowed = ["Do Not Authenticate", "Allow"]
+    actions_blocked = ["Force Deny (Content Filter)", "Force Deny"]
+    actions_bypass  = ["acc-log-fac", "dny-exc", "effective-threat-risk-lvl"]
 
-    if col_ac in allow_actions:
+    if col_ac in actions_allowed:
         return True
-    if col_ac in deny_action:
+    if col_ac in actions_blocked:
         return False
 
     dst_object_type = get_xml_object_type(col_ac)
     if dst_object_type == 'auth-obj':
         return get_auth_obj_match(col_ac)
     if dst_object_type == 'adm-auth-obj':
-        if get_adm_auth_obj_match(col_ac):
-            return True
-        else:
-            return False
-    if dst_object_type == 'acc-log-fac':
+        return get_adm_auth_obj_match(col_ac)
+    if dst_object_type in actions_bypass:
         return None
-    if dst_object_type == 'dny-exc':
-        return None
-    if dst_object_type == 'effective-threat-risk-lvl':
-        return None
-    else:
-        yellow("Warning: Action not evaluated. See logs for more information")
-        logging.warning("Object type '%s' not parsing in evaluate_action()", dst_object_type)
+
+    yellow("Warning: Action not evaluated. See logs for more information")
+    logging.warning("Object type '%s' not parsing in evaluate_action()", dst_object_type)
+    return None
 
 def get_rows_src_match(layer, match_src_objects, match_comb_obj):
     """
@@ -1036,7 +1021,7 @@ def get_rows_src_match(layer, match_src_objects, match_comb_obj):
     Output:
         match_array_src     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
     """
-    logging.debug("Exec: get_rows_src_match()")
+    # logging.debug("Exec: get_rows_src_match()")
 
     # Init array
     match_array_src = []
@@ -1075,9 +1060,11 @@ def get_rows_dst_match(match_array_src, match_dst_objects, match_comb_obj_dst):
     Output:
         match_array_dst     - ([] List)     [layer (XML Element), row (XML Element), action (bool)].
     """
-    logging.debug("Exec: get_rows_dst_match()")
+    # logging.debug("Exec: get_rows_dst_match()")
 
     match_array_dst = []
+    dst_bypass      = ["threat-risk", "svr-cert"]
+    dst_evaluated   = ["node", "a-url", "categorylist4", "ipobject", "comb-obj"]
 
     for match in match_array_src:
         layer  = match[0]
@@ -1088,12 +1075,9 @@ def get_rows_dst_match(match_array_src, match_dst_objects, match_comb_obj_dst):
             match_array_dst.append([layer, row, action])
         else:
             object_type = get_xml_object_type(row_dst)
-            # Bypass threat-risk and svr-cert objects
-            if object_type == 'threat-risk' or object_type == 'svr-cert':
+            if object_type in dst_bypass:
                 match_array_dst.append([layer, row, action])
-            elif not object_type == 'node' and not object_type == 'a-url'\
-            and not object_type == 'categorylist4'and not object_type == 'ipobject'\
-            and not object_type == 'comb-obj':
+            elif not object_type in dst_evaluated:
                 yellow("Warning: Object not evaluated. See logs for more information")
                 logging.warning("Object type '%s' not parsing in get_rows_dst_match(%s)", object_type, row_dst)
 
@@ -1106,7 +1090,7 @@ def print_layer_row(match_array):
     Input:
         match_array - (List) [layer, row, action].
     """
-    logging.debug("Exec print_layer_row()")
+    # logging.debug("Exec print_layer_row()")
 
     # Define static print values
     headers         = ["", "Layer", "Row", "Src", "Dst", "Action", "Description"]
@@ -1128,10 +1112,10 @@ def print_layer_row(match_array):
         # Set print action
         if match[2]:
             action = action_allow
-        elif match[2] == False:
-            action = action_deny
-        else:
+        elif match[2] is None:
             action = action_unknown
+        else:
+            action = action_deny
 
         # Generate array for tabulate output
         print_array.append([action,layer_name,col_no,col_so,col_de,col_ac,col_co])
@@ -1178,5 +1162,4 @@ def msg_wrn(message):
     print(yellow(message))
 
 if __name__ == "__main__":
-    """"""
     main()
